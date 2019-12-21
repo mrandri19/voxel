@@ -7,11 +7,13 @@ use glutin::event_loop::{ControlFlow, EventLoop};
 use glutin::window::{Window, WindowBuilder};
 use glutin::{ContextBuilder, ContextWrapper, PossiblyCurrent};
 
+mod chunk;
 mod debug_message_callback;
 mod program;
 mod shader;
 mod vertex;
 
+use chunk::Chunk;
 use vertex::Vertex;
 
 fn cube() -> Vec<Vertex> {
@@ -54,9 +56,6 @@ fn cube() -> Vec<Vertex> {
         Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]),
     ];
 }
-
-const CHUNK_X_BLOCKS: usize = 64;
-const CHUNK_Y_BLOCKS: usize = 64;
 
 fn degrees_to_radians(degrees: f32) -> f32 {
     degrees * glm::pi::<f32>() / 180.
@@ -119,6 +118,7 @@ fn draw(
     vbo: GLuint,
     texture: GLuint,
     program: &program::Program,
+    chunk: &Chunk,
 ) {
     unsafe {
         gl::ClearColor(0.2, 0.3, 0.3, 1.0);
@@ -187,11 +187,16 @@ fn draw(
 
     let mut vertices = vec![];
     let mut offsets = vec![];
-    vertices.reserve(cube().len() * CHUNK_X_BLOCKS * CHUNK_Y_BLOCKS);
-    offsets.reserve(CHUNK_X_BLOCKS * CHUNK_Y_BLOCKS);
-    for y in 0..CHUNK_Y_BLOCKS {
-        for x in 0..CHUNK_X_BLOCKS {
-            offsets.push(glm::vec3(x as f32 - 8., y as f32 - 8., 0.));
+    vertices.reserve(cube().len() * chunk.x_blocks() * chunk.y_blocks());
+    offsets.reserve(chunk.x_blocks() * chunk.y_blocks());
+
+    for y in 0..chunk.y_blocks() {
+        for x in 0..chunk.x_blocks() {
+            offsets.push(glm::vec3(
+                x as f32 - 8.,
+                y as f32 - 8.,
+                chunk.get(x, y) as f32,
+            ));
             vertices.extend(cube());
         }
     }
@@ -218,10 +223,9 @@ fn draw(
             offsets.as_ptr() as *const GLvoid,
             gl::STATIC_DRAW,
         );
-        gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+
         // layout (location = 2) in vec3 view_offset;
         gl::EnableVertexAttribArray(2);
-        gl::BindBuffer(gl::ARRAY_BUFFER, instance_vbo);
         gl::VertexAttribPointer(
             2,
             3,
@@ -239,7 +243,7 @@ fn draw(
             gl::TRIANGLES,
             0,
             cube().len() as GLsizei,
-            (CHUNK_X_BLOCKS * CHUNK_Y_BLOCKS) as GLsizei,
+            (chunk.x_blocks() * chunk.y_blocks()) as GLsizei,
         );
     }
 }
@@ -326,6 +330,8 @@ fn main() {
     let mut last_x = (width / 2.) as f32;
     let mut last_y = (height / 2.) as f32;
 
+    let chunk = Chunk::new();
+
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::EventsCleared => {
@@ -345,6 +351,7 @@ fn main() {
                     vbo,
                     texture,
                     &program,
+                    &chunk,
                 );
                 ctx.swap_buffers().unwrap();
             }
