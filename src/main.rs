@@ -18,42 +18,48 @@ use vertex::Vertex;
 
 fn cube() -> Vec<Vertex> {
     return vec![
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 0.0]),
-        Vertex::new([0.5, -0.5, -0.5], [1.0, 0.0]),
-        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),
-        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),
-        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]),
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 0.0]),
-        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]),
-        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0]),
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 1.0]),
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 1.0]),
-        Vertex::new([-0.5, 0.5, 0.5], [0.0, 1.0]),
-        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]),
-        Vertex::new([-0.5, 0.5, 0.5], [1.0, 0.0]),
-        Vertex::new([-0.5, 0.5, -0.5], [1.0, 1.0]),
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]),
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]),
-        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]),
-        Vertex::new([-0.5, 0.5, 0.5], [1.0, 0.0]),
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]),
-        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),
-        Vertex::new([0.5, -0.5, -0.5], [0.0, 1.0]),
-        Vertex::new([0.5, -0.5, -0.5], [0.0, 1.0]),
-        Vertex::new([0.5, -0.5, 0.5], [0.0, 0.0]),
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]),
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]),
-        Vertex::new([0.5, -0.5, -0.5], [1.0, 1.0]),
-        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0]),
-        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0]),
-        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]),
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]),
-        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]),
-        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]),
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]),
-        Vertex::new([-0.5, 0.5, 0.5], [0.0, 0.0]),
-        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]),
+        // Back face
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 0.0]), // Bottom-left
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),   // top-right
+        Vertex::new([0.5, -0.5, -0.5], [1.0, 0.0]),  // bottom-right
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),   // top-right
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 0.0]), // bottom-left
+        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]),  // top-left
+        // Front face
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-left
+        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0]),  // bottom-right
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 1.0]),   // top-right
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 1.0]),   // top-right
+        Vertex::new([-0.5, 0.5, 0.5], [0.0, 1.0]),  // top-left
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-left
+        // Left face
+        Vertex::new([-0.5, 0.5, 0.5], [1.0, 0.0]), // top-right
+        Vertex::new([-0.5, 0.5, -0.5], [1.0, 1.0]), // top-left
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-left
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-left
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-right
+        Vertex::new([-0.5, 0.5, 0.5], [1.0, 0.0]), // top-right
+        // Right face
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]), // top-left
+        Vertex::new([0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-right
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]), // top-right
+        Vertex::new([0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-right
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]), // top-left
+        Vertex::new([0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-left
+        // Bottom face
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // top-right
+        Vertex::new([0.5, -0.5, -0.5], [1.0, 1.0]),  // top-left
+        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0]),   // bottom-left
+        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0]),   // bottom-left
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]),  // bottom-right
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // top-right
+        // Top face
+        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]), // top-left
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]),   // bottom-right
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),  // top-right
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]),   // bottom-right
+        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]), // top-left
+        Vertex::new([-0.5, 0.5, 0.5], [0.0, 0.0]),  // bottom-left
     ];
 }
 
@@ -66,6 +72,7 @@ fn make_gl_ctx_and_event_loop() -> (ContextWrapper<PossiblyCurrent, Window>, Eve
     let window_builder = WindowBuilder::new();
     let windowed_context = ContextBuilder::new()
         .with_gl(glutin::GlRequest::Latest)
+        .with_gl_profile(glutin::GlProfile::Core)
         .build_windowed(window_builder, &event_loop)
         .unwrap();
 
@@ -86,16 +93,17 @@ fn make_gl_ctx_and_event_loop() -> (ContextWrapper<PossiblyCurrent, Window>, Eve
 
     let windowed_context = unsafe { windowed_context.make_current().unwrap() };
 
-    windowed_context
-        .window()
-        .set_fullscreen(Some(glutin::window::Fullscreen::Exclusive(video_mode)));
+    // windowed_context
+    //     .window()
+    //     .set_fullscreen(Some(glutin::window::Fullscreen::Exclusive(video_mode)));
 
-    windowed_context.window().set_cursor_visible(false);
-    windowed_context
-        .window()
-        .set_cursor_position(glutin::dpi::LogicalPosition::new(960., 540.))
-        .unwrap();
-    windowed_context.window().set_cursor_grab(true).unwrap();
+    // windowed_context.window().set_cursor_visible(false);
+    // windowed_context
+    //     .window()
+    //     .set_cursor_position(glutin::dpi::LogicalPosition::new(960., 540.))
+    //     .unwrap();
+    // windowed_context.window().set_cursor_grab(true).unwrap();
+
     return (windowed_context, event_loop);
 }
 
@@ -115,13 +123,12 @@ fn draw(
     camera_pos: glm::Vec3,
     ctx: &ContextWrapper<PossiblyCurrent, Window>,
     vao: GLuint,
-    vbo: GLuint,
     texture: GLuint,
     program: &program::Program,
     chunk: &Chunk,
 ) {
     unsafe {
-        gl::ClearColor(0.2, 0.3, 0.3, 1.0);
+        gl::ClearColor(0., 0., 0., 1.);
         gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
     }
 
@@ -187,19 +194,21 @@ fn draw(
 
     let mut vertices = vec![];
     let mut offsets = vec![];
-    vertices.reserve(cube().len() * chunk.x_blocks() * chunk.y_blocks());
-    offsets.reserve(chunk.x_blocks() * chunk.y_blocks());
+    vertices.reserve(cube().len() * chunk.x_blocks() * chunk.y_blocks() * chunk.z_blocks());
+    offsets.reserve(chunk.x_blocks() * chunk.y_blocks() * chunk.z_blocks());
 
-    for y in 0..chunk.y_blocks() {
-        for x in 0..chunk.x_blocks() {
-            offsets.push(glm::vec3(
-                x as f32 - 8.,
-                y as f32 - 8.,
-                chunk.get(x, y) as f32,
-            ));
-            vertices.extend(cube());
+    for z in 0..chunk.z_blocks() {
+        for y in 0..chunk.y_blocks() {
+            for x in 0..chunk.x_blocks() {
+                offsets.push(glm::vec3(x as f32, y as f32, z as f32));
+                vertices.extend(cube());
+            }
         }
     }
+
+    // Create Vertex Buffer Object
+    let mut vbo = 0;
+    unsafe { gl::CreateBuffers(1, &mut vbo) };
 
     unsafe {
         gl::NamedBufferData(
@@ -215,7 +224,7 @@ fn draw(
     // TODO(andrea): use DSA api instead
     let mut instance_vbo = 0;
     unsafe {
-        gl::GenBuffers(1, &mut instance_vbo);
+        gl::CreateBuffers(1, &mut instance_vbo);
         gl::BindBuffer(gl::ARRAY_BUFFER, instance_vbo);
         gl::BufferData(
             gl::ARRAY_BUFFER,
@@ -243,9 +252,12 @@ fn draw(
             gl::TRIANGLES,
             0,
             cube().len() as GLsizei,
-            (chunk.x_blocks() * chunk.y_blocks()) as GLsizei,
+            (chunk.x_blocks() * chunk.y_blocks() * chunk.z_blocks()) as GLsizei,
         );
     }
+
+    unsafe { gl::DeleteBuffers(1, &instance_vbo) };
+    unsafe { gl::DeleteBuffers(1, &vbo) };
 }
 
 fn main() {
@@ -254,10 +266,12 @@ fn main() {
 
     // Enable depth testing
     unsafe { gl::Enable(gl::DEPTH_TEST) };
+    unsafe { gl::DepthFunc(gl::LESS) };
 
-    // Create Vertex Buffer Object
-    let mut vbo = 0;
-    unsafe { gl::CreateBuffers(1, &mut vbo) };
+    // Enable back face culling
+    unsafe { gl::Enable(gl::CULL_FACE) };
+    unsafe { gl::FrontFace(gl::CCW) };
+    unsafe { gl::CullFace(gl::BACK) };
 
     // Create Vertex Array Object
     let mut vao = 0;
@@ -348,7 +362,6 @@ fn main() {
                     camera_pos,
                     &ctx,
                     vao,
-                    vbo,
                     texture,
                     &program,
                     &chunk,
@@ -433,7 +446,7 @@ fn main() {
                 glutin::event::VirtualKeyCode::Space => {
                     camera_pos = camera_pos + glm::vec3(0., 0., 1.);
                 }
-                glutin::event::VirtualKeyCode::LControl => {
+                glutin::event::VirtualKeyCode::C => {
                     camera_pos = camera_pos + glm::vec3(0., 0., -1.);
                 }
                 glutin::event::VirtualKeyCode::Escape => {
