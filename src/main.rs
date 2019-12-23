@@ -123,6 +123,8 @@ fn draw(
     camera_pos: glm::Vec3,
     ctx: &ContextWrapper<PossiblyCurrent, Window>,
     vao: GLuint,
+    cube_vertices_vbo: GLuint,
+    view_offsets_vbo: GLuint,
     texture: GLuint,
     program: &program::Program,
     chunk: &Chunk,
@@ -192,45 +194,36 @@ fn draw(
     unsafe { gl::BindTextureUnit(texture_unit, texture) };
     unsafe { gl::ProgramUniform1i(program.get_id(), 3, texture_unit as i32) };
 
-    let mut vertices = vec![];
-    let mut offsets = vec![];
-    vertices.reserve(cube().len() * chunk.x_blocks() * chunk.y_blocks() * chunk.z_blocks());
-    offsets.reserve(chunk.x_blocks() * chunk.y_blocks() * chunk.z_blocks());
+    let cube_vertices = cube();
+    let mut cubes_offsets = vec![];
+    cubes_offsets.reserve(chunk.x_blocks() * chunk.y_blocks() * chunk.z_blocks());
 
     for z in 0..chunk.z_blocks() {
         for y in 0..chunk.y_blocks() {
             for x in 0..chunk.x_blocks() {
-                offsets.push(glm::vec3(x as f32, y as f32, z as f32));
-                vertices.extend(cube());
+                cubes_offsets.push(glm::vec3(x as f32, y as f32, z as f32));
             }
         }
     }
 
-    // Create Vertex Buffer Object
-    let mut vbo = 0;
-    unsafe { gl::CreateBuffers(1, &mut vbo) };
-
     unsafe {
-        gl::NamedBufferData(
-            vbo,
-            (vertices.len() * std::mem::size_of::<Vertex>()) as GLsizeiptr,
-            vertices.as_ptr() as *const GLvoid,
-            gl::STATIC_DRAW,
+        gl::NamedBufferSubData(
+            cube_vertices_vbo,
+            0,
+            (cube_vertices.len() * std::mem::size_of::<Vertex>()) as GLsizeiptr,
+            cube_vertices.as_ptr() as *const GLvoid,
         )
     };
 
-    Vertex::vertex_specification(vao, vbo);
+    Vertex::vertex_specification(vao, cube_vertices_vbo);
 
-    // TODO(andrea): use DSA api instead
-    let mut instance_vbo = 0;
     unsafe {
-        gl::CreateBuffers(1, &mut instance_vbo);
-        gl::BindBuffer(gl::ARRAY_BUFFER, instance_vbo);
+        gl::BindBuffer(gl::ARRAY_BUFFER, view_offsets_vbo);
         gl::BufferData(
             gl::ARRAY_BUFFER,
-            (offsets.len() * std::mem::size_of::<glm::Vec3>()) as GLsizeiptr,
-            offsets.as_ptr() as *const GLvoid,
-            gl::STATIC_DRAW,
+            (cubes_offsets.len() * std::mem::size_of::<glm::Vec3>()) as GLsizeiptr,
+            cubes_offsets.as_ptr() as *const GLvoid,
+            gl::DYNAMIC_DRAW,
         );
 
         // layout (location = 2) in vec3 view_offset;
@@ -244,25 +237,40 @@ fn draw(
             std::ptr::null(),
         );
         gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+        // we call glVertexAttribDivisor. This function tells OpenGL when to update the
+        // content of a vertex attribute to the next element. Its first parameter is the
+        // vertex attribute in question and the second parameter the attribute divisor.
+        // By default the attribute divisor is 0 which tells OpenGL to update the content
+        // of the vertex attribute each iteration of the vertex shader. By setting this
+        // attribute to 1 we're telling OpenGL that we want to update the content of the
+        // vertex attribute when we start to render a new instance. By setting it to 2 we'd
+        // update the content every 2 instances and so on. By setting the attribute divisor
+        // to 1 we're effectively telling OpenGL that the vertex attribute at attribute location 2
+        // is an instanced array.
         gl::VertexAttribDivisor(2, 1);
     }
 
+    // With vertex attributes, each run of the vertex shader will cause GLSL to
+    // retrieve the next set of vertex attributes that belong to the current vertex.
+    // When defining a vertex attribute as an instanced array however, the vertex
+    // shader only updates the content of the vertex attribute per instance instead
+    // of per vertex. This allows us to use the standard vertex attributes for data
+    // per vertex and use the instanced array for storing data that is unique per instance.
     unsafe {
         gl::DrawArraysInstanced(
             gl::TRIANGLES,
             0,
-            cube().len() as GLsizei,
-            (chunk.x_blocks() * chunk.y_blocks() * chunk.z_blocks()) as GLsizei,
+            cube_vertices.len() as GLsizei,
+            cubes_offsets.len() as GLsizei,
         );
     }
-
-    unsafe { gl::DeleteBuffers(1, &instance_vbo) };
-    unsafe { gl::DeleteBuffers(1, &vbo) };
 }
 
 fn main() {
     let (ctx, event_loop) = make_gl_ctx_and_event_loop();
     init_opengl(&ctx);
+
+    let chunk = Chunk::new();
 
     // Enable depth testing
     unsafe { gl::Enable(gl::DEPTH_TEST) };
@@ -272,6 +280,23 @@ fn main() {
     unsafe { gl::Enable(gl::CULL_FACE) };
     unsafe { gl::FrontFace(gl::CCW) };
     unsafe { gl::CullFace(gl::BACK) };
+
+    // Create Vertex Buffer Object
+    let mut cube_vertices_vbo = 0;
+    unsafe {
+        gl::CreateBuffers(1, &mut cube_vertices_vbo);
+        gl::NamedBufferData(
+            cube_vertices_vbo,
+            (cube().len() * std::mem::size_of::<Vertex>()) as GLsizeiptr,
+            std::ptr::null(),
+            gl::DYNAMIC_DRAW,
+        )
+    };
+
+    let mut view_offsets_vbo = 0;
+    unsafe {
+        gl::CreateBuffers(1, &mut view_offsets_vbo);
+    }
 
     // Create Vertex Array Object
     let mut vao = 0;
@@ -344,8 +369,6 @@ fn main() {
     let mut last_x = (width / 2.) as f32;
     let mut last_y = (height / 2.) as f32;
 
-    let chunk = Chunk::new();
-
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::EventsCleared => {
@@ -355,6 +378,8 @@ fn main() {
                 event: WindowEvent::RedrawRequested,
                 ..
             } => {
+                use std::time::Instant;
+                let now = Instant::now();
                 draw(
                     pitch,
                     yaw,
@@ -362,10 +387,13 @@ fn main() {
                     camera_pos,
                     &ctx,
                     vao,
+                    cube_vertices_vbo,
+                    view_offsets_vbo,
                     texture,
                     &program,
                     &chunk,
                 );
+                println!("{} ms", now.elapsed().as_micros() as f32 / 1000.);
                 ctx.swap_buffers().unwrap();
             }
             Event::WindowEvent {

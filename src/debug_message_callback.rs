@@ -57,6 +57,6 @@ pub extern "system" fn callback(
     );
 
     if !(_severity == "LOW" || _severity == "NOTIFICATION") {
-        panic!();
+        // panic!();
     }
 }
