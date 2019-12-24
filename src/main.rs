@@ -195,13 +195,13 @@ fn draw(
     unsafe { gl::ProgramUniform1i(program.get_id(), 3, texture_unit as i32) };
 
     let cube_vertices = cube();
-    let mut cubes_offsets = vec![];
-    cubes_offsets.reserve(chunk.x_blocks() * chunk.y_blocks() * chunk.z_blocks());
+    let mut cubes_offsets =
+        Vec::with_capacity(chunk.x_blocks() * chunk.y_blocks() * chunk.z_blocks());
 
     for z in 0..chunk.z_blocks() {
         for y in 0..chunk.y_blocks() {
             for x in 0..chunk.x_blocks() {
-                cubes_offsets.push(glm::vec3(x as f32, y as f32, z as f32));
+                cubes_offsets.push([x as f32, y as f32, z as f32]);
             }
         }
     }
@@ -221,9 +221,9 @@ fn draw(
         gl::BindBuffer(gl::ARRAY_BUFFER, view_offsets_vbo);
         gl::BufferData(
             gl::ARRAY_BUFFER,
-            (cubes_offsets.len() * std::mem::size_of::<glm::Vec3>()) as GLsizeiptr,
+            (cubes_offsets.len() * std::mem::size_of::<[f32; 3]>()) as GLsizeiptr,
             cubes_offsets.as_ptr() as *const GLvoid,
-            gl::DYNAMIC_DRAW,
+            gl::STATIC_DRAW,
         );
 
         // layout (location = 2) in vec3 view_offset;
@@ -281,7 +281,7 @@ fn main() {
     unsafe { gl::FrontFace(gl::CCW) };
     unsafe { gl::CullFace(gl::BACK) };
 
-    // Create Vertex Buffer Object
+    // Create vbo for a single cube's vertices
     let mut cube_vertices_vbo = 0;
     unsafe {
         gl::CreateBuffers(1, &mut cube_vertices_vbo);
@@ -293,6 +293,7 @@ fn main() {
         )
     };
 
+    // Create vbo for a single cube's vertices
     let mut view_offsets_vbo = 0;
     unsafe {
         gl::CreateBuffers(1, &mut view_offsets_vbo);
