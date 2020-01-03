@@ -13,8 +13,12 @@ mod program;
 mod shader;
 mod vertex;
 
-use chunk::Chunk;
+use chunk::{Chunk, COBBLESTONE};
+use program::Program;
+use shader::Shader;
 use vertex::Vertex;
+
+use std::ffi::CString;
 
 fn cube() -> Vec<Vertex> {
     return vec![
@@ -124,9 +128,9 @@ fn draw(
     ctx: &ContextWrapper<PossiblyCurrent, Window>,
     vao: GLuint,
     cube_vertices_vbo: GLuint,
-    view_offsets_vbo: GLuint,
     texture: GLuint,
-    program: &program::Program,
+    offsets_program: &Program,
+    drawing_program: &Program,
     chunk: &Chunk,
 ) {
     unsafe {
@@ -162,7 +166,7 @@ fn draw(
     let model_uniform_location = 0;
     unsafe {
         gl::ProgramUniformMatrix4fv(
-            program.get_id(),
+            drawing_program.get_id(),
             model_uniform_location,
             1,
             gl::FALSE,
@@ -172,7 +176,7 @@ fn draw(
     let view_uniform_location = 1;
     unsafe {
         gl::ProgramUniformMatrix4fv(
-            program.get_id(),
+            drawing_program.get_id(),
             view_uniform_location,
             1,
             gl::FALSE,
@@ -182,7 +186,7 @@ fn draw(
     let projection_uniform_location = 2;
     unsafe {
         gl::ProgramUniformMatrix4fv(
-            program.get_id(),
+            drawing_program.get_id(),
             projection_uniform_location,
             1,
             gl::FALSE,
@@ -192,7 +196,7 @@ fn draw(
 
     let texture_unit = 0;
     unsafe { gl::BindTextureUnit(texture_unit, texture) };
-    unsafe { gl::ProgramUniform1i(program.get_id(), 3, texture_unit as i32) };
+    unsafe { gl::ProgramUniform1i(drawing_program.get_id(), 3, texture_unit as i32) };
 
     let cube_vertices = cube();
     let mut cubes_offsets =
@@ -201,10 +205,65 @@ fn draw(
     for z in 0..chunk.z_blocks() {
         for y in 0..chunk.y_blocks() {
             for x in 0..chunk.x_blocks() {
-                cubes_offsets.push([x as f32, y as f32, z as f32]);
+                if chunk.get(x, y, z) == COBBLESTONE {
+                    cubes_offsets.push([x as f32, y as f32, z as f32, 1.0]);
+                }
             }
         }
     }
+
+    let mut offsets_program_ssbo = 0;
+    let index_binding_point = 0;
+    unsafe {
+        gl::GenBuffers(1, &mut offsets_program_ssbo);
+        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, offsets_program_ssbo);
+        gl::BufferData(
+            gl::SHADER_STORAGE_BUFFER,
+            (cubes_offsets.len() * std::mem::size_of::<[GLfloat; 4]>()) as GLsizeiptr,
+            cubes_offsets.as_ptr() as *const GLvoid,
+            gl::DYNAMIC_READ,
+        );
+
+        gl::BindBufferBase(
+            gl::SHADER_STORAGE_BUFFER,
+            index_binding_point,
+            offsets_program_ssbo,
+        );
+
+        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
+    }
+
+    // unsafe {
+    //     gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, offsets_program_ssbo);
+    //     let ptr = gl::MapBuffer(gl::SHADER_STORAGE_BUFFER, gl::READ_ONLY) as *const GLfloat;
+    //     println!("before");
+    //     dbg!(std::slice::from_raw_parts(ptr, 9));
+
+    //     gl::UnmapBuffer(gl::SHADER_STORAGE_BUFFER);
+    //     gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
+    // }
+
+    // offsets_program.use_();
+
+    // unsafe {
+    //     // Run compute shader
+    //     gl::DispatchCompute(cubes_offsets.len() as GLuint, 1, 1);
+
+    //     // Accesses to shader storage blocks after the barrier
+    //     // will reflect writes prior to the barrier.
+    //     // Wait for the shader to run and write to its storage
+    //     gl::MemoryBarrier(gl::SHADER_STORAGE_BARRIER_BIT);
+    // };
+
+    // unsafe {
+    //     gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, offsets_program_ssbo);
+    //     let ptr = gl::MapBuffer(gl::SHADER_STORAGE_BUFFER, gl::READ_ONLY) as *const GLfloat;
+    //     println!("after");
+    //     dbg!(std::slice::from_raw_parts(ptr, 9));
+
+    //     gl::UnmapBuffer(gl::SHADER_STORAGE_BUFFER);
+    //     gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
+    // }
 
     unsafe {
         gl::NamedBufferSubData(
@@ -218,22 +277,16 @@ fn draw(
     Vertex::vertex_specification(vao, cube_vertices_vbo);
 
     unsafe {
-        gl::BindBuffer(gl::ARRAY_BUFFER, view_offsets_vbo);
-        gl::BufferData(
-            gl::ARRAY_BUFFER,
-            (cubes_offsets.len() * std::mem::size_of::<[f32; 3]>()) as GLsizeiptr,
-            cubes_offsets.as_ptr() as *const GLvoid,
-            gl::STATIC_DRAW,
-        );
-
-        // layout (location = 2) in vec3 view_offset;
-        gl::EnableVertexAttribArray(2);
+        gl::BindBuffer(gl::ARRAY_BUFFER, offsets_program_ssbo);
+        let location = 2;
+        // layout (location = 2) in vec4 view_offset;
+        gl::EnableVertexArrayAttrib(vao, location);
         gl::VertexAttribPointer(
-            2,
-            3,
+            location,
+            4,
             gl::FLOAT,
             gl::FALSE,
-            (3 * std::mem::size_of::<f32>()) as GLsizei,
+            (4 * std::mem::size_of::<f32>()) as GLsizei,
             std::ptr::null(),
         );
         gl::BindBuffer(gl::ARRAY_BUFFER, 0);
@@ -247,8 +300,10 @@ fn draw(
         // update the content every 2 instances and so on. By setting the attribute divisor
         // to 1 we're effectively telling OpenGL that the vertex attribute at attribute location 2
         // is an instanced array.
-        gl::VertexAttribDivisor(2, 1);
+        gl::VertexAttribDivisor(location, 1);
     }
+
+    drawing_program.use_();
 
     // With vertex attributes, each run of the vertex shader will cause GLSL to
     // retrieve the next set of vertex attributes that belong to the current vertex.
@@ -263,6 +318,8 @@ fn draw(
             cube_vertices.len() as GLsizei,
             cubes_offsets.len() as GLsizei,
         );
+
+        gl::DeleteBuffers(1, &mut offsets_program_ssbo);
     }
 }
 
@@ -293,20 +350,52 @@ fn main() {
         )
     };
 
-    // Create vbo for a single cube's vertices
-    let mut view_offsets_vbo = 0;
-    unsafe {
-        gl::CreateBuffers(1, &mut view_offsets_vbo);
-    }
-
     // Create Vertex Array Object
     let mut vao = 0;
     unsafe { gl::CreateVertexArrays(1, &mut vao) };
     unsafe { gl::BindVertexArray(vao) };
 
     // Create and use shader program
-    let program = program::Program::new().unwrap();
-    program.use_();
+
+    let drawing_program = {
+        let vertex_shader = Shader::from_source(
+            &CString::new(include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/shaders/triangle.vert"
+            )))
+            .unwrap(),
+            gl::VERTEX_SHADER,
+        )
+        .unwrap();
+        let fragment_shader = Shader::from_source(
+            &CString::new(include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/shaders/triangle.frag"
+            )))
+            .unwrap(),
+            gl::FRAGMENT_SHADER,
+        )
+        .unwrap();
+        program::Program::new(vec![
+            (vertex_shader, gl::VERTEX_SHADER),
+            (fragment_shader, gl::FRAGMENT_SHADER),
+        ])
+        .unwrap()
+    };
+
+    let offsets_program = {
+        let basic_compute_shader = shader::Shader::from_source(
+            &CString::new(include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/shaders/basic.comp"
+            )))
+            .unwrap(),
+            gl::COMPUTE_SHADER,
+        )
+        .unwrap();
+
+        program::Program::new(vec![(basic_compute_shader, gl::COMPUTE_SHADER)]).unwrap()
+    };
 
     // Load texture
     let texture_image = image::open("textures/mossy_cobblestone.png")
@@ -389,9 +478,9 @@ fn main() {
                     &ctx,
                     vao,
                     cube_vertices_vbo,
-                    view_offsets_vbo,
                     texture,
-                    &program,
+                    &offsets_program,
+                    &drawing_program,
                     &chunk,
                 );
                 println!("{} ms", now.elapsed().as_micros() as f32 / 1000.);
