@@ -198,73 +198,96 @@ fn draw(
     unsafe { gl::BindTextureUnit(texture_unit, texture) };
     unsafe { gl::ProgramUniform1i(drawing_program.get_id(), 3, texture_unit as i32) };
 
-    let cube_vertices = cube();
-    let mut cubes_offsets =
-        Vec::with_capacity(chunk.x_blocks() * chunk.y_blocks() * chunk.z_blocks());
+    let number_of_cubes = chunk.x_blocks() * chunk.y_blocks() * chunk.z_blocks();
 
-    for z in 0..chunk.z_blocks() {
-        for y in 0..chunk.y_blocks() {
-            for x in 0..chunk.x_blocks() {
-                if chunk.get(x, y, z) == COBBLESTONE {
-                    cubes_offsets.push([x as f32, y as f32, z as f32, 1.0]);
-                }
-            }
-        }
-    }
-
-    let mut offsets_program_ssbo = 0;
+    let mut input_ssbo = 0;
     let index_binding_point = 0;
     unsafe {
-        gl::GenBuffers(1, &mut offsets_program_ssbo);
-        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, offsets_program_ssbo);
+        gl::GenBuffers(1, &mut input_ssbo);
+        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, input_ssbo);
         gl::BufferData(
             gl::SHADER_STORAGE_BUFFER,
-            (cubes_offsets.len() * std::mem::size_of::<[GLfloat; 4]>()) as GLsizeiptr,
-            cubes_offsets.as_ptr() as *const GLvoid,
-            gl::DYNAMIC_READ,
+            (number_of_cubes * std::mem::size_of::<[GLfloat; 4]>()) as GLsizeiptr,
+            std::ptr::null() as *const GLvoid,
+            gl::STREAM_DRAW,
         );
 
-        gl::BindBufferBase(
+        gl::BindBufferBase(gl::SHADER_STORAGE_BUFFER, index_binding_point, input_ssbo);
+
+        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
+    }
+
+    let mut output_ssbo = 0;
+    let index_binding_point = 1;
+    unsafe {
+        gl::GenBuffers(1, &mut output_ssbo);
+        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, output_ssbo);
+        gl::BufferData(
             gl::SHADER_STORAGE_BUFFER,
-            index_binding_point,
-            offsets_program_ssbo,
+            (number_of_cubes * std::mem::size_of::<[GLfloat; 4]>()) as GLsizeiptr,
+            std::ptr::null() as *const GLvoid,
+            gl::STREAM_COPY,
         );
+
+        gl::BindBufferBase(gl::SHADER_STORAGE_BUFFER, index_binding_point, output_ssbo);
 
         gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
     }
 
     // unsafe {
-    //     gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, offsets_program_ssbo);
+    //     gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, input_ssbo);
     //     let ptr = gl::MapBuffer(gl::SHADER_STORAGE_BUFFER, gl::READ_ONLY) as *const GLfloat;
-    //     println!("before");
+    //     println!("before input_ssbo");
     //     dbg!(std::slice::from_raw_parts(ptr, 9));
 
     //     gl::UnmapBuffer(gl::SHADER_STORAGE_BUFFER);
     //     gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
     // }
+    unsafe {
+        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, output_ssbo);
+        let ptr = gl::MapBuffer(gl::SHADER_STORAGE_BUFFER, gl::READ_ONLY) as *const GLfloat;
+        println!("before output_ssbo");
+        dbg!(std::slice::from_raw_parts(ptr, 16));
 
-    // offsets_program.use_();
+        gl::UnmapBuffer(gl::SHADER_STORAGE_BUFFER);
+        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
+    }
 
+    offsets_program.use_();
+
+    unsafe {
+        // Run compute shader
+        gl::DispatchCompute(
+            chunk.x_blocks() as GLuint,
+            chunk.y_blocks() as GLuint,
+            chunk.z_blocks() as GLuint,
+        );
+
+        // Accesses to shader storage blocks after the barrier
+        // will reflect writes prior to the barrier.
+        // Wait for the shader to run and write to its storage
+        gl::MemoryBarrier(gl::SHADER_STORAGE_BARRIER_BIT);
+    };
     // unsafe {
-    //     // Run compute shader
-    //     gl::DispatchCompute(cubes_offsets.len() as GLuint, 1, 1);
-
-    //     // Accesses to shader storage blocks after the barrier
-    //     // will reflect writes prior to the barrier.
-    //     // Wait for the shader to run and write to its storage
-    //     gl::MemoryBarrier(gl::SHADER_STORAGE_BARRIER_BIT);
-    // };
-
-    // unsafe {
-    //     gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, offsets_program_ssbo);
+    //     gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, input_ssbo);
     //     let ptr = gl::MapBuffer(gl::SHADER_STORAGE_BUFFER, gl::READ_ONLY) as *const GLfloat;
-    //     println!("after");
+    //     println!("after input_ssbo");
     //     dbg!(std::slice::from_raw_parts(ptr, 9));
 
     //     gl::UnmapBuffer(gl::SHADER_STORAGE_BUFFER);
     //     gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
     // }
+    unsafe {
+        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, output_ssbo);
+        let ptr = gl::MapBuffer(gl::SHADER_STORAGE_BUFFER, gl::READ_ONLY) as *const GLfloat;
+        println!("after output_ssbo");
+        dbg!(std::slice::from_raw_parts(ptr, 16));
 
+        gl::UnmapBuffer(gl::SHADER_STORAGE_BUFFER);
+        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
+    }
+
+    let cube_vertices = cube();
     unsafe {
         gl::NamedBufferSubData(
             cube_vertices_vbo,
@@ -277,7 +300,7 @@ fn draw(
     Vertex::vertex_specification(vao, cube_vertices_vbo);
 
     unsafe {
-        gl::BindBuffer(gl::ARRAY_BUFFER, offsets_program_ssbo);
+        gl::BindBuffer(gl::ARRAY_BUFFER, output_ssbo);
         let location = 2;
         // layout (location = 2) in vec4 view_offset;
         gl::EnableVertexArrayAttrib(vao, location);
@@ -316,10 +339,11 @@ fn draw(
             gl::TRIANGLES,
             0,
             cube_vertices.len() as GLsizei,
-            cubes_offsets.len() as GLsizei,
+            number_of_cubes as GLsizei,
         );
 
-        gl::DeleteBuffers(1, &mut offsets_program_ssbo);
+        gl::DeleteBuffers(1, &mut input_ssbo);
+        gl::DeleteBuffers(1, &mut output_ssbo);
     }
 }
 
