@@ -33,8 +33,8 @@ fn draw(
     camera_pos: &glm::Vec3,
     width: f64,
     height: f64,
-    vao: GLuint,
-    cube_vertices_vbo: GLuint,
+    cube_vao: GLuint,
+    cube_bo: GLuint,
     texture: GLuint,
     drawing_program: &Program,
     chunk: &Chunk,
@@ -64,8 +64,6 @@ fn draw(
     let aspect_ratio = (width / height) as f32;
     let projection: glm::Mat4 = glm::perspective(aspect_ratio, fov, NEAR_DISTANCE, FAR_DISTANCE);
 
-    let mvp = projection * view * model;
-
     // Pass the matrices as uniforms
     let model_uniform_location = 0;
     unsafe {
@@ -74,7 +72,29 @@ fn draw(
             model_uniform_location,
             1,
             gl::FALSE,
-            glm::value_ptr(&mvp).as_ptr(),
+            glm::value_ptr(&model).as_ptr(),
+        )
+    };
+
+    let view_uniform_location = 1;
+    unsafe {
+        gl::ProgramUniformMatrix4fv(
+            drawing_program.get_id(),
+            view_uniform_location,
+            1,
+            gl::FALSE,
+            glm::value_ptr(&view).as_ptr(),
+        )
+    };
+
+    let projection_uniform_location = 2;
+    unsafe {
+        gl::ProgramUniformMatrix4fv(
+            drawing_program.get_id(),
+            projection_uniform_location,
+            1,
+            gl::FALSE,
+            glm::value_ptr(&projection).as_ptr(),
         )
     };
 
@@ -88,21 +108,20 @@ fn draw(
     // ************************************************************************
     // Add cube vertices to their vbo and vao descriptor
 
-    let cube_vertices = cube();
+    let cube = cube();
     unsafe {
         gl::NamedBufferSubData(
-            cube_vertices_vbo,
+            cube_bo,
             0,
-            (cube_vertices.len() * std::mem::size_of::<Vertex>()) as GLsizeiptr,
-            cube_vertices.as_ptr() as *const GLvoid,
+            (cube.len() * std::mem::size_of::<Vertex>()) as GLsizeiptr,
+            cube.as_ptr() as *const GLvoid,
         )
     };
 
-    Vertex::vertex_specification(vao, cube_vertices_vbo);
+    Vertex::vertex_specification(cube_vao, cube_bo);
 
     // ************************************************************************
     // Use raycasting to figure out which cubes to display
-
     let mut offsets: Vec<[GLfloat; 3]> = Vec::with_capacity(CHUNK_BLOCKS);
 
     let mut block_used: [bool; CHUNK_BLOCKS] = [false; CHUNK_BLOCKS];
@@ -203,11 +222,11 @@ fn draw(
 
     // ************************************************************************
     // Create cubes offsets buffer and bind them to be used for instanced drawing
-    let mut offsets_buffer = 0;
+    let mut offsets_bo = 0;
 
     unsafe {
-        gl::CreateBuffers(1, &mut offsets_buffer);
-        gl::BindBuffer(gl::ARRAY_BUFFER, offsets_buffer);
+        gl::CreateBuffers(1, &mut offsets_bo);
+        gl::BindBuffer(gl::ARRAY_BUFFER, offsets_bo);
         gl::BufferData(
             gl::ARRAY_BUFFER,
             (offsets.len() * std::mem::size_of::<[GLfloat; 3]>()) as GLsizeiptr,
@@ -215,9 +234,9 @@ fn draw(
             gl::DYNAMIC_DRAW,
         );
 
-        let location = 2;
-        // layout (location = 2) in vec4 view_offset;
-        gl::EnableVertexArrayAttrib(vao, location);
+        let location = 3;
+        // layout (location = 3) in vec4 view_offset;
+        gl::EnableVertexArrayAttrib(cube_vao, location);
         gl::VertexAttribPointer(
             location,
             3,
@@ -240,11 +259,11 @@ fn draw(
         gl::DrawArraysInstanced(
             gl::TRIANGLES,
             0,
-            cube_vertices.len() as GLsizei,
+            cube.len() as GLsizei,
             offsets.len() as GLsizei,
         );
 
-        gl::DeleteBuffers(1, &mut offsets_buffer);
+        gl::DeleteBuffers(1, &mut offsets_bo);
     }
 }
 
@@ -288,11 +307,11 @@ fn main() {
     unsafe { gl::CullFace(gl::BACK) };
 
     // Create vbo for a single cube's vertices
-    let mut cube_vertices_vbo = 0;
+    let mut cube_bo = 0;
     unsafe {
-        gl::CreateBuffers(1, &mut cube_vertices_vbo);
+        gl::CreateBuffers(1, &mut cube_bo);
         gl::NamedBufferData(
-            cube_vertices_vbo,
+            cube_bo,
             (cube().len() * std::mem::size_of::<Vertex>()) as GLsizeiptr,
             std::ptr::null(),
             gl::DYNAMIC_DRAW,
@@ -300,9 +319,9 @@ fn main() {
     };
 
     // Create Vertex Array Object
-    let mut vao = 0;
-    unsafe { gl::CreateVertexArrays(1, &mut vao) };
-    unsafe { gl::BindVertexArray(vao) };
+    let mut cube_vao = 0;
+    unsafe { gl::CreateVertexArrays(1, &mut cube_vao) };
+    unsafe { gl::BindVertexArray(cube_vao) };
 
     // Create and use shader program
 
@@ -479,8 +498,8 @@ fn main() {
                 &last_camera_pos,
                 last_width as f64,
                 last_height as f64,
-                vao,
-                cube_vertices_vbo,
+                cube_vao,
+                cube_bo,
                 texture,
                 &drawing_program,
                 &chunk,

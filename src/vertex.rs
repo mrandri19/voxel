@@ -5,12 +5,14 @@ use gl::types::*;
 pub struct Vertex {
     position: [GLfloat; 3],
     texture_uv: [GLfloat; 2],
+    normal: [GLfloat; 3],
 }
 impl Vertex {
-    pub fn new(position: [GLfloat; 3], texture_uv: [GLfloat; 2]) -> Self {
+    pub fn new(position: [GLfloat; 3], texture_uv: [GLfloat; 2], normal: [GLfloat; 3]) -> Self {
         Self {
             position,
             texture_uv,
+            normal,
         }
     }
 
@@ -32,6 +34,13 @@ impl Vertex {
             gl::EnableVertexArrayAttrib(vao, location);
             gl::VertexArrayAttribFormat(vao, location, 2, gl::FLOAT, gl::FALSE, offset);
             gl::VertexArrayAttribBinding(vao, location, 0);
+
+            // layout (location = 2) in vec3 in_normal;
+            let offset = (5 * std::mem::size_of::<GLfloat>()) as GLuint;
+            let location = 2;
+            gl::EnableVertexArrayAttrib(vao, location);
+            gl::VertexArrayAttribFormat(vao, location, 3, gl::FLOAT, gl::FALSE, offset);
+            gl::VertexArrayAttribBinding(vao, location, 0);
         }
     }
 }
@@ -39,46 +48,46 @@ impl Vertex {
 pub fn cube() -> Vec<Vertex> {
     return vec![
         // Back face
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 0.0]), // Bottom-left
-        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),   // top-right
-        Vertex::new([0.5, -0.5, -0.5], [1.0, 0.0]),  // bottom-right
-        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),   // top-right
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 0.0]), // bottom-left
-        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]),  // top-left
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 0.0], [0.0, 0.0, -1.0]), // Bottom-left
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0], [0.0, 0.0, -1.0]),   // top-right
+        Vertex::new([0.5, -0.5, -0.5], [1.0, 0.0], [0.0, 0.0, -1.0]),  // bottom-right
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0], [0.0, 0.0, -1.0]),   // top-right
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 0.0], [0.0, 0.0, -1.0]), // bottom-left
+        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0], [0.0, 0.0, -1.0]),  // top-left
         // Front face
-        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-left
-        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0]),  // bottom-right
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 1.0]),   // top-right
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 1.0]),   // top-right
-        Vertex::new([-0.5, 0.5, 0.5], [0.0, 1.0]),  // top-left
-        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-left
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0], [0.0, 0.0, 1.0]), // bottom-left
+        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0], [0.0, 0.0, 1.0]),  // bottom-right
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 1.0], [0.0, 0.0, 1.0]),   // top-right
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 1.0], [0.0, 0.0, 1.0]),   // top-right
+        Vertex::new([-0.5, 0.5, 0.5], [0.0, 1.0], [0.0, 0.0, 1.0]),  // top-left
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0], [0.0, 0.0, 1.0]), // bottom-left
         // Left face
-        Vertex::new([-0.5, 0.5, 0.5], [1.0, 0.0]), // top-right
-        Vertex::new([-0.5, 0.5, -0.5], [1.0, 1.0]), // top-left
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-left
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-left
-        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-right
-        Vertex::new([-0.5, 0.5, 0.5], [1.0, 0.0]), // top-right
+        Vertex::new([-0.5, 0.5, 0.5], [1.0, 0.0], [-1.0, 0.0, 0.0]), // top-right
+        Vertex::new([-0.5, 0.5, -0.5], [1.0, 1.0], [-1.0, 0.0, 0.0]), // top-left
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0], [-1.0, 0.0, 0.0]), // bottom-left
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0], [-1.0, 0.0, 0.0]), // bottom-left
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0], [-1.0, 0.0, 0.0]), // bottom-right
+        Vertex::new([-0.5, 0.5, 0.5], [1.0, 0.0], [-1.0, 0.0, 0.0]), // top-right
         // Right face
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]), // top-left
-        Vertex::new([0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-right
-        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]), // top-right
-        Vertex::new([0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-right
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]), // top-left
-        Vertex::new([0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-left
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0], [1.0, 0.0, 0.0]), // top-left
+        Vertex::new([0.5, -0.5, -0.5], [0.0, 1.0], [1.0, 0.0, 0.0]), // bottom-right
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0], [1.0, 0.0, 0.0]), // top-right
+        Vertex::new([0.5, -0.5, -0.5], [0.0, 1.0], [1.0, 0.0, 0.0]), // bottom-right
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0], [1.0, 0.0, 0.0]), // top-left
+        Vertex::new([0.5, -0.5, 0.5], [0.0, 0.0], [1.0, 0.0, 0.0]), // bottom-left
         // Bottom face
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // top-right
-        Vertex::new([0.5, -0.5, -0.5], [1.0, 1.0]),  // top-left
-        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0]),   // bottom-left
-        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0]),   // bottom-left
-        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]),  // bottom-right
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // top-right
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0], [0.0, -1.0, 0.0]), // top-right
+        Vertex::new([0.5, -0.5, -0.5], [1.0, 1.0], [0.0, -1.0, 0.0]),  // top-left
+        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0], [0.0, -1.0, 0.0]),   // bottom-left
+        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0], [0.0, -1.0, 0.0]),   // bottom-left
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0], [0.0, -1.0, 0.0]),  // bottom-right
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0], [0.0, -1.0, 0.0]), // top-right
         // Top face
-        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]), // top-left
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]),   // bottom-right
-        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),  // top-right
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]),   // bottom-right
-        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]), // top-left
-        Vertex::new([-0.5, 0.5, 0.5], [0.0, 0.0]),  // bottom-left
+        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0], [0.0, 1.0, 0.0]), // top-left
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0], [0.0, 1.0, 0.0]),   // bottom-right
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0], [0.0, 1.0, 0.0]),  // top-right
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0], [0.0, 1.0, 0.0]),   // bottom-right
+        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0], [0.0, 1.0, 0.0]), // top-left
+        Vertex::new([-0.5, 0.5, 0.5], [0.0, 0.0], [0.0, 1.0, 0.0]),  // bottom-left
     ];
 }
