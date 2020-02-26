@@ -2,10 +2,7 @@ use gl::types::*;
 
 extern crate nalgebra_glm as glm;
 
-use glutin::event::{Event, WindowEvent};
-use glutin::event_loop::{ControlFlow, EventLoop};
-use glutin::window::{Window, WindowBuilder};
-use glutin::{ContextBuilder, ContextWrapper, PossiblyCurrent};
+use glfw::{Action, Context, Key};
 
 mod chunk;
 mod debug_message_callback;
@@ -13,119 +10,29 @@ mod program;
 mod shader;
 mod vertex;
 
-use chunk::{Chunk, COBBLESTONE};
+use chunk::{Chunk, CHUNK_X_SIZE, CHUNK_Y_SIZE, CHUNK_Z_SIZE, COBBLESTONE};
 use program::Program;
 use shader::Shader;
-use vertex::Vertex;
+use vertex::{cube, Vertex};
 
 use std::ffi::CString;
 
-fn cube() -> Vec<Vertex> {
-    return vec![
-        // Back face
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 0.0]), // Bottom-left
-        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),   // top-right
-        Vertex::new([0.5, -0.5, -0.5], [1.0, 0.0]),  // bottom-right
-        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),   // top-right
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 0.0]), // bottom-left
-        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]),  // top-left
-        // Front face
-        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-left
-        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0]),  // bottom-right
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 1.0]),   // top-right
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 1.0]),   // top-right
-        Vertex::new([-0.5, 0.5, 0.5], [0.0, 1.0]),  // top-left
-        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-left
-        // Left face
-        Vertex::new([-0.5, 0.5, 0.5], [1.0, 0.0]), // top-right
-        Vertex::new([-0.5, 0.5, -0.5], [1.0, 1.0]), // top-left
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-left
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-left
-        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-right
-        Vertex::new([-0.5, 0.5, 0.5], [1.0, 0.0]), // top-right
-        // Right face
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]), // top-left
-        Vertex::new([0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-right
-        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]), // top-right
-        Vertex::new([0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-right
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]), // top-left
-        Vertex::new([0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-left
-        // Bottom face
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // top-right
-        Vertex::new([0.5, -0.5, -0.5], [1.0, 1.0]),  // top-left
-        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0]),   // bottom-left
-        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0]),   // bottom-left
-        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]),  // bottom-right
-        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // top-right
-        // Top face
-        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]), // top-left
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]),   // bottom-right
-        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),  // top-right
-        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]),   // bottom-right
-        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]), // top-left
-        Vertex::new([-0.5, 0.5, 0.5], [0.0, 0.0]),  // bottom-left
-    ];
-}
+const MOUSE_SENSITIVITY: f32 = 0.1;
+const INITIAL_WIDTH: u32 = 1920;
+const INITIAL_HEIGHT: u32 = 1920;
+
+const NEAR_DISTANCE: f32 = 0.1;
+const FAR_DISTANCE: f32 = 100.;
 
 fn degrees_to_radians(degrees: f32) -> f32 {
     degrees * glm::pi::<f32>() / 180.
 }
 
-fn make_gl_ctx_and_event_loop() -> (ContextWrapper<PossiblyCurrent, Window>, EventLoop<()>) {
-    let event_loop = EventLoop::new();
-    let window_builder = WindowBuilder::new();
-    let windowed_context = ContextBuilder::new()
-        .with_gl(glutin::GlRequest::Latest)
-        .with_gl_profile(glutin::GlProfile::Core)
-        .build_windowed(window_builder, &event_loop)
-        .unwrap();
-
-    // Select the first video mode
-    let mut video_mode = windowed_context
-        .window()
-        .current_monitor()
-        .video_modes()
-        .next()
-        .unwrap();
-    for vm in windowed_context.window().current_monitor().video_modes() {
-        if vm.size().width > video_mode.size().width
-            && vm.refresh_rate() > video_mode.refresh_rate()
-        {
-            video_mode = vm;
-        }
-    }
-
-    let windowed_context = unsafe { windowed_context.make_current().unwrap() };
-
-    // windowed_context
-    //     .window()
-    //     .set_fullscreen(Some(glutin::window::Fullscreen::Exclusive(video_mode)));
-
-    // windowed_context.window().set_cursor_visible(false);
-    // windowed_context
-    //     .window()
-    //     .set_cursor_position(glutin::dpi::LogicalPosition::new(960., 540.))
-    //     .unwrap();
-    // windowed_context.window().set_cursor_grab(true).unwrap();
-
-    return (windowed_context, event_loop);
-}
-
-fn init_opengl(ctx: &ContextWrapper<PossiblyCurrent, Window>) {
-    gl::load_with(|s| ctx.get_proc_address(s) as *const _);
-
-    unsafe {
-        gl::Enable(gl::DEBUG_OUTPUT_SYNCHRONOUS);
-        gl::DebugMessageCallback(Some(debug_message_callback::callback), std::ptr::null())
-    }
-}
-
 fn draw(
-    pitch: f32,
-    yaw: f32,
-    last_camera_front: &mut glm::Vec3,
-    camera_pos: glm::Vec3,
-    ctx: &ContextWrapper<PossiblyCurrent, Window>,
+    camera_ray: &glm::Vec3,
+    camera_pos: &glm::Vec3,
+    width: f64,
+    height: f64,
     vao: GLuint,
     cube_vertices_vbo: GLuint,
     texture: GLuint,
@@ -147,29 +54,15 @@ fn draw(
     let model: glm::Mat4 = glm::identity();
     let model = glm::translate(&model, &glm::vec3(0., 0., 0.));
 
-    let camera_ray = glm::vec3(
-        degrees_to_radians(pitch).cos() * degrees_to_radians(yaw).sin(),
-        degrees_to_radians(pitch).cos() * degrees_to_radians(yaw).cos(),
-        degrees_to_radians(pitch).sin(),
-    );
-    let camera_ray = glm::normalize(&camera_ray);
-    *last_camera_front = camera_ray;
-
     let view: glm::Mat4 = glm::look_at(
         &camera_pos,                // eye: position of the camera
         &(camera_pos + camera_ray), // center: position where the camera is looking at
         &up,                        // up: normalized up vector
     );
 
-    let (width, height): (f64, f64) = ctx
-        .window()
-        .inner_size()
-        .to_physical(ctx.window().hidpi_factor())
-        .into();
-    let far_distance = 100.;
     let fov = glm::half_pi();
     let aspect_ratio = (width / height) as f32;
-    let projection: glm::Mat4 = glm::perspective(aspect_ratio, fov, 0.1, far_distance);
+    let projection: glm::Mat4 = glm::perspective(aspect_ratio, fov, NEAR_DISTANCE, FAR_DISTANCE);
 
     let mvp = projection * view * model;
 
@@ -210,17 +103,22 @@ fn draw(
     // ************************************************************************
     // Use raycasting to figure out which cubes to display
 
-    let mut offsets: Vec<[GLfloat; 4]> = vec![];
+    let mut offsets: Vec<[GLfloat; 4]> =
+        Vec::with_capacity((CHUNK_X_SIZE * CHUNK_Y_SIZE * CHUNK_Z_SIZE) as usize);
 
-    let far_height = 1.3 * 2. * (fov / 2.).tan() * far_distance;
+    let mut block_used: [bool; (CHUNK_X_SIZE * CHUNK_Y_SIZE * CHUNK_Z_SIZE) as usize] =
+        [false; (CHUNK_X_SIZE * CHUNK_Y_SIZE * CHUNK_Z_SIZE) as usize];
+
+    let far_height = 2. * ((1.1 * fov) / 2.).tan() * FAR_DISTANCE;
     let far_width = aspect_ratio * far_height;
 
     let right = glm::cross(&camera_ray, &up).normalize();
-    let fc = camera_pos + camera_ray * far_distance;
-    let fbl = fc - (up * far_height / 2.) - (right * far_width / 2.);
+    let camera_up = glm::cross(&right, &camera_ray).normalize();
+    let fc = camera_pos + camera_ray * FAR_DISTANCE;
+    let fbl = fc - (camera_up * far_height / 2.) - (right * far_width / 2.);
 
-    let max_u = 71;
-    let max_v = 40;
+    let max_u = 300;
+    let max_v = 180;
     for v in 0..max_v {
         for u in 0..max_u {
             let du = u as GLfloat / max_u as GLfloat;
@@ -230,21 +128,23 @@ fn draw(
             // ray starting position
             let ray_start = camera_pos;
             // ray direction
-            let ray_direction = fbl + up * far_height * dv + right * far_width * du;
+            let ray_direction =
+                (fbl + camera_up * far_height * dv + right * far_width * du) - ray_start;
             let ray_direction = ray_direction.normalize();
             // voxel on which the ray origin is found
-            let mut ray_voxel = glm::trunc(&camera_pos);
+            let mut ray_voxel = glm::floor(&camera_pos);
             // how much to increment as we cross voxel boundaries
             let step = glm::sign(&ray_direction);
             // the value of t at which the ray crosses the fist vertical voxel boundary
             let mut t_max = ((ray_voxel + step) - ray_start)
                 .component_div(&ray_direction.add_scalar(0.0000001));
             // how far along the ray we must move for each component of such movement to equal the width of a voxel
-            let t_delta = glm::vec3(1., 1., 1.)
-                .component_div(&ray_direction.component_mul(&step.add_scalar(0.0000001)));
+            let t_delta = (glm::vec3(1., 1., 1.)
+                .component_div(&ray_direction.add_scalar(0.0000001)))
+            .component_mul(&step);
 
             // traversal step
-            loop {
+            for _ in 0..(FAR_DISTANCE * (3.0f32).sqrt() + 1.) as u32 {
                 if t_max.x < t_max.y {
                     if t_max.x < t_max.z {
                         ray_voxel.x += step.x;
@@ -263,26 +163,40 @@ fn draw(
                     }
                 }
 
-                if ray_voxel.x >= chunk.x_blocks() as f32 {
+                if ray_voxel.x >= (CHUNK_X_SIZE as f32) {
                     break;
                 }
-                if ray_voxel.y >= chunk.y_blocks() as f32 {
+                if ray_voxel.y >= (CHUNK_Y_SIZE as f32) {
                     break;
                 }
-                if ray_voxel.z >= chunk.z_blocks() as f32 {
+                if ray_voxel.z >= (CHUNK_Z_SIZE as f32) {
+                    break;
+                }
+                if ray_voxel.x < 0. {
+                    break;
+                }
+                if ray_voxel.y < 0. {
+                    break;
+                }
+                if ray_voxel.z < 0. {
                     break;
                 }
 
-                if ray_voxel.x < 0. || ray_voxel.y < 0. || ray_voxel.z < 0. {
-                    continue;
-                }
+                let x_ = ray_voxel.x as GLuint;
+                let y_ = ray_voxel.y as GLuint;
+                let z_ = ray_voxel.z as GLuint;
+                let x = ray_voxel.x;
+                let y = ray_voxel.y;
+                let z = ray_voxel.z;
 
-                let x = ray_voxel.x as GLuint;
-                let y = ray_voxel.y as GLuint;
-                let z = ray_voxel.z as GLuint;
-
-                if chunk.get(x, y, z) == COBBLESTONE {
-                    offsets.push([x as GLfloat, y as GLfloat, z as GLfloat, 1.]);
+                if chunk.get(x_, y_, z_) == COBBLESTONE
+                    && !block_used
+                        [(z_ * CHUNK_Y_SIZE * CHUNK_X_SIZE + y_ * CHUNK_X_SIZE + x_) as usize]
+                {
+                    block_used
+                        [(z_ * CHUNK_Y_SIZE * CHUNK_X_SIZE + y_ * CHUNK_X_SIZE + x_) as usize] =
+                        true;
+                    offsets.push([x, y, z, 1.]);
                     break;
                 }
             }
@@ -339,8 +253,30 @@ fn draw(
 fn main() {
     let up = glm::vec3(0., 0., 1.);
 
-    let (ctx, event_loop) = make_gl_ctx_and_event_loop();
-    init_opengl(&ctx);
+    let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
+    glfw.window_hint(glfw::WindowHint::Resizable(true));
+    let (mut window, events) = glfw
+        .with_primary_monitor(|g, m| {
+            g.create_window(
+                INITIAL_WIDTH,
+                INITIAL_HEIGHT,
+                "Hello this is window",
+                m.map_or(glfw::WindowMode::Windowed, |m| {
+                    glfw::WindowMode::FullScreen(m)
+                }),
+            )
+        })
+        .expect("Failed to create GLFW window.");
+    window.set_all_polling(true);
+    window.set_cursor_mode(glfw::CursorMode::Disabled);
+    window.make_current();
+
+    gl::load_with(|s| window.get_proc_address(s) as *const _);
+
+    unsafe {
+        gl::Enable(gl::DEBUG_OUTPUT_SYNCHRONOUS);
+        gl::DebugMessageCallback(Some(debug_message_callback::callback), std::ptr::null())
+    }
 
     let chunk = Chunk::new();
 
@@ -444,153 +380,128 @@ fn main() {
         gl::TextureParameteri(texture, gl::TEXTURE_MAG_FILTER, gl::NEAREST as GLint);
     };
 
-    // Initial camera position
-    let mut camera_pos = glm::vec3(-1., -1., 0.);
+    let mut last_camera_pos = glm::vec3(3., 3., 5.);
+    let mut last_camera_ray = glm::vec3(0., 1., 0.);
+    let mut last_yaw = 0.;
+    let mut last_pitch = 0.;
+    let mut last_x = 0.;
+    let mut last_y = 0.;
+    let mut last_width = INITIAL_WIDTH;
+    let mut last_height = INITIAL_HEIGHT;
 
-    // Initial camera orientation
-    let mut last_camera_front = glm::vec3(0., 1., 0.);
+    while !window.should_close() {
+        glfw.poll_events();
+        for (_, event) in glfw::flush_messages(&events) {
+            match event {
+                glfw::WindowEvent::Size(width, height) => {
+                    last_width = width as u32;
+                    last_height = height as u32;
+                    unsafe { gl::Viewport(0, 0, width as GLsizei, height as GLsizei) };
+                }
+                glfw::WindowEvent::Close => window.set_should_close(true),
+                glfw::WindowEvent::CursorPos(x, y) => {
+                    let x = x as f32;
+                    let y = y as f32;
 
-    // Initial yaw and pitch
-    let mut yaw = 0.;
-    let mut pitch = 0.;
+                    let xoffset = (x - last_x) * MOUSE_SENSITIVITY;
+                    let yoffset = (y - last_y) * MOUSE_SENSITIVITY;
 
-    // Initial mouse position
-    let (width, height): (f64, f64) = ctx
-        .window()
-        .inner_size()
-        .to_physical(ctx.window().hidpi_factor())
-        .into();
-    let mut last_x = (width / 2.) as f32;
-    let mut last_y = (height / 2.) as f32;
+                    last_yaw += xoffset;
+                    last_pitch -= yoffset;
 
-    event_loop.run(move |event, _, control_flow| {
-        match event {
-            Event::EventsCleared => {
-                ctx.window().request_redraw();
-            }
-            Event::WindowEvent {
-                event: WindowEvent::RedrawRequested,
-                ..
-            } => {
-                unsafe {
-                    let mut query = 0;
-                    gl::GenQueries(1, &mut query);
-                    gl::BeginQuery(gl::TIME_ELAPSED, query);
-                    use std::time::Instant;
-                    let now = Instant::now();
-                    draw(
-                        pitch,
-                        yaw,
-                        &mut last_camera_front,
-                        camera_pos,
-                        &ctx,
-                        vao,
-                        cube_vertices_vbo,
-                        texture,
-                        &drawing_program,
-                        &chunk,
+                    if last_pitch > 89.9 {
+                        last_pitch = 89.9;
+                    }
+                    if last_pitch < -89.9 {
+                        last_pitch = -89.9;
+                    }
+
+                    last_x = x;
+                    last_y = y;
+
+                    let camera_ray = glm::vec3(
+                        degrees_to_radians(last_pitch).cos() * degrees_to_radians(last_yaw).sin(),
+                        degrees_to_radians(last_pitch).cos() * degrees_to_radians(last_yaw).cos(),
+                        degrees_to_radians(last_pitch).sin(),
                     );
-                    let cpu_time = now.elapsed().as_micros() as f32 / 1000.;
-                    gl::EndQuery(gl::TIME_ELAPSED);
-                    let mut gpu_time = 0;
-                    gl::GetQueryObjectiv(query, gl::QUERY_RESULT, &mut gpu_time);
-                    gl::DeleteQueries(1, &query as *const _);
-
-                    println!(
-                        "CPU: {:.2} ms, GPU: {:.2} ms",
-                        cpu_time,
-                        gpu_time as f64 / 1_000_000.0
-                    );
+                    let camera_ray = glm::normalize(&camera_ray);
+                    *last_camera_ray = *camera_ray;
                 }
-                ctx.swap_buffers().unwrap();
-            }
-            Event::WindowEvent {
-                event: WindowEvent::Resized(logical_size),
-                ..
-            } => {
-                let (width, height): (u32, u32) =
-                    logical_size.to_physical(ctx.window().hidpi_factor()).into();
-                unsafe { gl::Viewport(0, 0, width as GLsizei, height as GLsizei) };
-            }
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                ..
-            } => {
-                *control_flow = ControlFlow::Exit;
-            }
-            Event::WindowEvent {
-                event: WindowEvent::CursorMoved { position, .. },
-                ..
-            } => {
-                let glutin::dpi::PhysicalPosition { x, y } =
-                    position.to_physical(ctx.window().hidpi_factor());
-
-                let mouse_sensitivity = 0.1;
-                let xoffset = (x as f32 - last_x) * mouse_sensitivity;
-                let yoffset = (y as f32 - last_y) * mouse_sensitivity;
-
-                yaw += xoffset;
-                pitch -= yoffset;
-
-                // TODO(andrea): figure a way to move the mouse past the window's boundary
-                // otherwise we cannot go turn over +- 90 degrees with a 1920 screen and 0.1 sens
-
-                // dbg!(x, last_x);
-                // dbg!(y, last_y);
-                // dbg!(yaw, pitch);
-
-                last_x = x as f32;
-                last_y = y as f32;
-            }
-            Event::WindowEvent {
-                event:
-                    WindowEvent::KeyboardInput {
-                        input:
-                            glutin::event::KeyboardInput {
-                                state: glutin::event::ElementState::Pressed,
-                                virtual_keycode: Some(virtual_keycode),
-                                ..
-                            },
-                        ..
-                    },
-                ..
-            } => match virtual_keycode {
-                glutin::event::VirtualKeyCode::W => {
-                    let mut direction = last_camera_front;
-                    direction.z = 0.;
-                    let direction = glm::normalize(&direction);
-                    camera_pos = camera_pos + direction;
-                }
-                glutin::event::VirtualKeyCode::A => {
-                    let mut right = glm::cross(&last_camera_front, &up);
-                    right.z = 0.;
-                    let direction = glm::normalize(&right);
-                    camera_pos = camera_pos - direction;
-                }
-                glutin::event::VirtualKeyCode::S => {
-                    let mut direction = last_camera_front;
-                    direction.z = 0.;
-                    let direction = glm::normalize(&direction);
-                    camera_pos = camera_pos - direction;
-                }
-                glutin::event::VirtualKeyCode::D => {
-                    let mut right = glm::cross(&last_camera_front, &up);
-                    right.z = 0.;
-                    let direction = glm::normalize(&right);
-                    camera_pos = camera_pos + direction;
-                }
-                glutin::event::VirtualKeyCode::Space => {
-                    camera_pos = camera_pos + up;
-                }
-                glutin::event::VirtualKeyCode::C => {
-                    camera_pos = camera_pos + glm::vec3(0., 0., -1.);
-                }
-                glutin::event::VirtualKeyCode::Escape => {
-                    *control_flow = ControlFlow::Exit;
+                glfw::WindowEvent::Key(key, _, action, _)
+                    if action == Action::Press || action == Action::Repeat =>
+                {
+                    match key {
+                        Key::W => {
+                            let mut direction = last_camera_ray;
+                            direction.z = 0.;
+                            let direction = glm::normalize(&direction);
+                            last_camera_pos += direction;
+                        }
+                        Key::A => {
+                            let mut right = glm::cross(&last_camera_ray, &up);
+                            right.z = 0.;
+                            let direction = glm::normalize(&right);
+                            last_camera_pos -= direction;
+                        }
+                        Key::S => {
+                            let mut direction = last_camera_ray;
+                            direction.z = 0.;
+                            let direction = glm::normalize(&direction);
+                            last_camera_pos -= direction;
+                        }
+                        Key::D => {
+                            let mut right = glm::cross(&last_camera_ray, &up);
+                            right.z = 0.;
+                            let direction = glm::normalize(&right);
+                            last_camera_pos += direction;
+                        }
+                        Key::Space => {
+                            last_camera_pos += up;
+                        }
+                        Key::C => {
+                            last_camera_pos -= up;
+                        }
+                        Key::Escape => window.set_should_close(true),
+                        _ => (),
+                    }
                 }
                 _ => (),
-            },
-            _ => *control_flow = ControlFlow::Poll,
+            }
         }
-    })
+        unsafe {
+            let mut query = 0;
+            gl::GenQueries(1, &mut query);
+            gl::BeginQuery(gl::TIME_ELAPSED, query);
+
+            use std::time::Instant;
+            let now = Instant::now();
+
+            draw(
+                &last_camera_ray,
+                &last_camera_pos,
+                last_width as f64,
+                last_height as f64,
+                vao,
+                cube_vertices_vbo,
+                texture,
+                &drawing_program,
+                &chunk,
+            );
+
+            let cpu_time = now.elapsed().as_micros() as f32 / 1000.;
+
+            gl::EndQuery(gl::TIME_ELAPSED);
+            let mut gpu_time = 0;
+            gl::GetQueryObjectiv(query, gl::QUERY_RESULT, &mut gpu_time);
+            gl::DeleteQueries(1, &query as *const _);
+
+            println!(
+                "CPU: {:.2} ms, GPU: {:.2} ms",
+                cpu_time,
+                gpu_time as f64 / 1_000_000.0
+            );
+        }
+
+        window.swap_buffers()
+    }
 }

@@ -7,9 +7,9 @@ pub struct Chunk {
     pub blocks: Vec<GLuint>,
 }
 
-const CHUNK_X_SIZE: GLuint = 64;
-const CHUNK_Y_SIZE: GLuint = 64;
-const CHUNK_Z_SIZE: GLuint = 64;
+pub const CHUNK_X_SIZE: GLuint = 100;
+pub const CHUNK_Y_SIZE: GLuint = 100;
+pub const CHUNK_Z_SIZE: GLuint = 100;
 
 impl Chunk {
     // TODO(andrea): make this much much cooler.
@@ -42,15 +42,6 @@ impl Chunk {
 
     #[inline(always)]
     pub fn get(&self, x: GLuint, y: GLuint, z: GLuint) -> GLuint {
-        self.blocks[(z * self.y_blocks() * self.x_blocks() + y * self.x_blocks() + x) as usize]
-    }
-    pub fn x_blocks(&self) -> GLuint {
-        CHUNK_X_SIZE
-    }
-    pub fn y_blocks(&self) -> GLuint {
-        CHUNK_Y_SIZE
-    }
-    pub fn z_blocks(&self) -> GLuint {
-        CHUNK_Z_SIZE
+        self.blocks[(z * CHUNK_Y_SIZE * CHUNK_X_SIZE + y * CHUNK_X_SIZE + x) as usize]
     }
 }

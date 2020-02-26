@@ -35,3 +35,50 @@ impl Vertex {
         }
     }
 }
+
+pub fn cube() -> Vec<Vertex> {
+    return vec![
+        // Back face
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 0.0]), // Bottom-left
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),   // top-right
+        Vertex::new([0.5, -0.5, -0.5], [1.0, 0.0]),  // bottom-right
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),   // top-right
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 0.0]), // bottom-left
+        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]),  // top-left
+        // Front face
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-left
+        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0]),  // bottom-right
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 1.0]),   // top-right
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 1.0]),   // top-right
+        Vertex::new([-0.5, 0.5, 0.5], [0.0, 1.0]),  // top-left
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-left
+        // Left face
+        Vertex::new([-0.5, 0.5, 0.5], [1.0, 0.0]), // top-right
+        Vertex::new([-0.5, 0.5, -0.5], [1.0, 1.0]), // top-left
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-left
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-left
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-right
+        Vertex::new([-0.5, 0.5, 0.5], [1.0, 0.0]), // top-right
+        // Right face
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]), // top-left
+        Vertex::new([0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-right
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]), // top-right
+        Vertex::new([0.5, -0.5, -0.5], [0.0, 1.0]), // bottom-right
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]), // top-left
+        Vertex::new([0.5, -0.5, 0.5], [0.0, 0.0]), // bottom-left
+        // Bottom face
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // top-right
+        Vertex::new([0.5, -0.5, -0.5], [1.0, 1.0]),  // top-left
+        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0]),   // bottom-left
+        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0]),   // bottom-left
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0]),  // bottom-right
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0]), // top-right
+        // Top face
+        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]), // top-left
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]),   // bottom-right
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0]),  // top-right
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0]),   // bottom-right
+        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0]), // top-left
+        Vertex::new([-0.5, 0.5, 0.5], [0.0, 0.0]),  // bottom-left
+    ];
+}
