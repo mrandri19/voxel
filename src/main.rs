@@ -126,7 +126,7 @@ fn draw(
 
     let mut block_used: [bool; CHUNK_BLOCKS] = [false; CHUNK_BLOCKS];
 
-    let far_height = 2. * ((fov) / 2.).tan() * FAR_DISTANCE;
+    let far_height = 2. * ((1.1 * fov) / 2.).tan() * FAR_DISTANCE;
     let far_width = aspect_ratio * far_height;
 
     let right = glm::cross(&camera_ray, &up).normalize();
