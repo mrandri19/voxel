@@ -22,7 +22,7 @@ const INITIAL_WIDTH: u32 = 1920;
 const INITIAL_HEIGHT: u32 = 1920;
 
 const NEAR_DISTANCE: f32 = 0.1;
-const FAR_DISTANCE: f32 = 200.;
+const FAR_DISTANCE: f32 = 128.;
 
 fn degrees_to_radians(degrees: f32) -> f32 {
     degrees * glm::pi::<f32>() / 180.
