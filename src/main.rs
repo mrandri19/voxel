@@ -129,30 +129,36 @@ fn draw(
     vao: GLuint,
     cube_vertices_vbo: GLuint,
     texture: GLuint,
-    offsets_program: &Program,
     drawing_program: &Program,
     chunk: &Chunk,
 ) {
+    let up: glm::TVec3<GLfloat> = glm::vec3(0., 0., 1.);
+    // ************************************************************************
+    // Clear screen and depth buffer
+
     unsafe {
         gl::ClearColor(0., 0., 0., 1.);
         gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
     }
 
+    // ************************************************************************
+    // Create model, view, projection matrices
+
     let model: glm::Mat4 = glm::identity();
     let model = glm::translate(&model, &glm::vec3(0., 0., 0.));
 
-    let camera_front = glm::vec3(
+    let camera_ray = glm::vec3(
         degrees_to_radians(pitch).cos() * degrees_to_radians(yaw).sin(),
         degrees_to_radians(pitch).cos() * degrees_to_radians(yaw).cos(),
         degrees_to_radians(pitch).sin(),
     );
-    let camera_front = glm::normalize(&camera_front);
-    *last_camera_front = camera_front;
+    let camera_ray = glm::normalize(&camera_ray);
+    *last_camera_front = camera_ray;
 
     let view: glm::Mat4 = glm::look_at(
-        &camera_pos,                  // eye: position of the camera
-        &(camera_pos + camera_front), // center: position where the camera is looking at
-        &glm::vec3(0., 0., 1.),       // up: normalized up vector
+        &camera_pos,                // eye: position of the camera
+        &(camera_pos + camera_ray), // center: position where the camera is looking at
+        &up,                        // up: normalized up vector
     );
 
     let (width, height): (f64, f64) = ctx
@@ -160,9 +166,14 @@ fn draw(
         .inner_size()
         .to_physical(ctx.window().hidpi_factor())
         .into();
-    let projection: glm::Mat4 =
-        glm::perspective((width / height) as f32, glm::half_pi(), 0.1, 100.);
+    let far_distance = 100.;
+    let fov = glm::half_pi();
+    let aspect_ratio = (width / height) as f32;
+    let projection: glm::Mat4 = glm::perspective(aspect_ratio, fov, 0.1, far_distance);
 
+    let mvp = projection * view * model;
+
+    // Pass the matrices as uniforms
     let model_uniform_location = 0;
     unsafe {
         gl::ProgramUniformMatrix4fv(
@@ -170,122 +181,19 @@ fn draw(
             model_uniform_location,
             1,
             gl::FALSE,
-            glm::value_ptr(&model).as_ptr(),
+            glm::value_ptr(&mvp).as_ptr(),
         )
     };
-    let view_uniform_location = 1;
-    unsafe {
-        gl::ProgramUniformMatrix4fv(
-            drawing_program.get_id(),
-            view_uniform_location,
-            1,
-            gl::FALSE,
-            glm::value_ptr(&view).as_ptr(),
-        )
-    };
-    let projection_uniform_location = 2;
-    unsafe {
-        gl::ProgramUniformMatrix4fv(
-            drawing_program.get_id(),
-            projection_uniform_location,
-            1,
-            gl::FALSE,
-            glm::value_ptr(&projection).as_ptr(),
-        )
-    };
+
+    // ************************************************************************
+    // Bind textures
 
     let texture_unit = 0;
     unsafe { gl::BindTextureUnit(texture_unit, texture) };
     unsafe { gl::ProgramUniform1i(drawing_program.get_id(), 3, texture_unit as i32) };
 
-    let number_of_cubes = chunk.x_blocks() * chunk.y_blocks() * chunk.z_blocks();
-
-    let mut input_ssbo = 0;
-    let index_binding_point = 0;
-    unsafe {
-        gl::GenBuffers(1, &mut input_ssbo);
-        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, input_ssbo);
-        gl::BufferData(
-            gl::SHADER_STORAGE_BUFFER,
-            (number_of_cubes * std::mem::size_of::<[GLfloat; 4]>()) as GLsizeiptr,
-            std::ptr::null() as *const GLvoid,
-            gl::STREAM_DRAW,
-        );
-
-        gl::BindBufferBase(gl::SHADER_STORAGE_BUFFER, index_binding_point, input_ssbo);
-
-        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
-    }
-
-    let mut output_ssbo = 0;
-    let index_binding_point = 1;
-    unsafe {
-        gl::GenBuffers(1, &mut output_ssbo);
-        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, output_ssbo);
-        gl::BufferData(
-            gl::SHADER_STORAGE_BUFFER,
-            (number_of_cubes * std::mem::size_of::<[GLfloat; 4]>()) as GLsizeiptr,
-            std::ptr::null() as *const GLvoid,
-            gl::STREAM_COPY,
-        );
-
-        gl::BindBufferBase(gl::SHADER_STORAGE_BUFFER, index_binding_point, output_ssbo);
-
-        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
-    }
-
-    // unsafe {
-    //     gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, input_ssbo);
-    //     let ptr = gl::MapBuffer(gl::SHADER_STORAGE_BUFFER, gl::READ_ONLY) as *const GLfloat;
-    //     println!("before input_ssbo");
-    //     dbg!(std::slice::from_raw_parts(ptr, 9));
-
-    //     gl::UnmapBuffer(gl::SHADER_STORAGE_BUFFER);
-    //     gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
-    // }
-    unsafe {
-        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, output_ssbo);
-        let ptr = gl::MapBuffer(gl::SHADER_STORAGE_BUFFER, gl::READ_ONLY) as *const GLfloat;
-        println!("before output_ssbo");
-        dbg!(std::slice::from_raw_parts(ptr, 16));
-
-        gl::UnmapBuffer(gl::SHADER_STORAGE_BUFFER);
-        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
-    }
-
-    offsets_program.use_();
-
-    unsafe {
-        // Run compute shader
-        gl::DispatchCompute(
-            chunk.x_blocks() as GLuint,
-            chunk.y_blocks() as GLuint,
-            chunk.z_blocks() as GLuint,
-        );
-
-        // Accesses to shader storage blocks after the barrier
-        // will reflect writes prior to the barrier.
-        // Wait for the shader to run and write to its storage
-        gl::MemoryBarrier(gl::SHADER_STORAGE_BARRIER_BIT);
-    };
-    // unsafe {
-    //     gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, input_ssbo);
-    //     let ptr = gl::MapBuffer(gl::SHADER_STORAGE_BUFFER, gl::READ_ONLY) as *const GLfloat;
-    //     println!("after input_ssbo");
-    //     dbg!(std::slice::from_raw_parts(ptr, 9));
-
-    //     gl::UnmapBuffer(gl::SHADER_STORAGE_BUFFER);
-    //     gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
-    // }
-    unsafe {
-        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, output_ssbo);
-        let ptr = gl::MapBuffer(gl::SHADER_STORAGE_BUFFER, gl::READ_ONLY) as *const GLfloat;
-        println!("after output_ssbo");
-        dbg!(std::slice::from_raw_parts(ptr, 16));
-
-        gl::UnmapBuffer(gl::SHADER_STORAGE_BUFFER);
-        gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
-    }
+    // ************************************************************************
+    // Add cube vertices to their vbo and vao descriptor
 
     let cube_vertices = cube();
     unsafe {
@@ -299,8 +207,102 @@ fn draw(
 
     Vertex::vertex_specification(vao, cube_vertices_vbo);
 
+    // ************************************************************************
+    // Use raycasting to figure out which cubes to display
+
+    let mut offsets: Vec<[GLfloat; 4]> = vec![];
+
+    let far_height = 1.3 * 2. * (fov / 2.).tan() * far_distance;
+    let far_width = aspect_ratio * far_height;
+
+    let right = glm::cross(&camera_ray, &up).normalize();
+    let fc = camera_pos + camera_ray * far_distance;
+    let fbl = fc - (up * far_height / 2.) - (right * far_width / 2.);
+
+    let max_u = 71;
+    let max_v = 40;
+    for v in 0..max_v {
+        for u in 0..max_u {
+            let du = u as GLfloat / max_u as GLfloat;
+            let dv = v as GLfloat / max_v as GLfloat;
+            // initialization step
+
+            // ray starting position
+            let ray_start = camera_pos;
+            // ray direction
+            let ray_direction = fbl + up * far_height * dv + right * far_width * du;
+            let ray_direction = ray_direction.normalize();
+            // voxel on which the ray origin is found
+            let mut ray_voxel = glm::trunc(&camera_pos);
+            // how much to increment as we cross voxel boundaries
+            let step = glm::sign(&ray_direction);
+            // the value of t at which the ray crosses the fist vertical voxel boundary
+            let mut t_max = ((ray_voxel + step) - ray_start)
+                .component_div(&ray_direction.add_scalar(0.0000001));
+            // how far along the ray we must move for each component of such movement to equal the width of a voxel
+            let t_delta = glm::vec3(1., 1., 1.)
+                .component_div(&ray_direction.component_mul(&step.add_scalar(0.0000001)));
+
+            // traversal step
+            loop {
+                if t_max.x < t_max.y {
+                    if t_max.x < t_max.z {
+                        ray_voxel.x += step.x;
+                        t_max.x += t_delta.x;
+                    } else {
+                        ray_voxel.z += step.z;
+                        t_max.z += t_delta.z;
+                    }
+                } else {
+                    if t_max.y < t_max.z {
+                        ray_voxel.y += step.y;
+                        t_max.y += t_delta.y;
+                    } else {
+                        ray_voxel.z += step.z;
+                        t_max.z += t_delta.z;
+                    }
+                }
+
+                if ray_voxel.x >= chunk.x_blocks() as f32 {
+                    break;
+                }
+                if ray_voxel.y >= chunk.y_blocks() as f32 {
+                    break;
+                }
+                if ray_voxel.z >= chunk.z_blocks() as f32 {
+                    break;
+                }
+
+                if ray_voxel.x < 0. || ray_voxel.y < 0. || ray_voxel.z < 0. {
+                    continue;
+                }
+
+                let x = ray_voxel.x as GLuint;
+                let y = ray_voxel.y as GLuint;
+                let z = ray_voxel.z as GLuint;
+
+                if chunk.get(x, y, z) == COBBLESTONE {
+                    offsets.push([x as GLfloat, y as GLfloat, z as GLfloat, 1.]);
+                    break;
+                }
+            }
+        }
+    }
+
+    // ************************************************************************
+    // Create cubes offsets buffer and bind them to be used for instanced drawing
+    let mut offsets_buffer = 0;
+
     unsafe {
-        gl::BindBuffer(gl::ARRAY_BUFFER, output_ssbo);
+        gl::CreateBuffers(1, &mut offsets_buffer);
+        gl::BindBuffer(gl::ARRAY_BUFFER, offsets_buffer);
+        gl::BufferData(
+            gl::ARRAY_BUFFER,
+            (offsets.len() * std::mem::size_of::<[GLfloat; 4]>()) as GLsizeiptr,
+            offsets.as_ptr() as *const GLvoid,
+            gl::DYNAMIC_DRAW,
+        );
+
         let location = 2;
         // layout (location = 2) in vec4 view_offset;
         gl::EnableVertexArrayAttrib(vao, location);
@@ -313,41 +315,30 @@ fn draw(
             std::ptr::null(),
         );
         gl::BindBuffer(gl::ARRAY_BUFFER, 0);
-        // we call glVertexAttribDivisor. This function tells OpenGL when to update the
-        // content of a vertex attribute to the next element. Its first parameter is the
-        // vertex attribute in question and the second parameter the attribute divisor.
-        // By default the attribute divisor is 0 which tells OpenGL to update the content
-        // of the vertex attribute each iteration of the vertex shader. By setting this
-        // attribute to 1 we're telling OpenGL that we want to update the content of the
-        // vertex attribute when we start to render a new instance. By setting it to 2 we'd
-        // update the content every 2 instances and so on. By setting the attribute divisor
-        // to 1 we're effectively telling OpenGL that the vertex attribute at attribute location 2
-        // is an instanced array.
+
         gl::VertexAttribDivisor(location, 1);
     }
 
+    // ************************************************************************
+    // Draw Instanced
+
     drawing_program.use_();
 
-    // With vertex attributes, each run of the vertex shader will cause GLSL to
-    // retrieve the next set of vertex attributes that belong to the current vertex.
-    // When defining a vertex attribute as an instanced array however, the vertex
-    // shader only updates the content of the vertex attribute per instance instead
-    // of per vertex. This allows us to use the standard vertex attributes for data
-    // per vertex and use the instanced array for storing data that is unique per instance.
     unsafe {
         gl::DrawArraysInstanced(
             gl::TRIANGLES,
             0,
             cube_vertices.len() as GLsizei,
-            number_of_cubes as GLsizei,
+            offsets.len() as GLsizei,
         );
 
-        gl::DeleteBuffers(1, &mut input_ssbo);
-        gl::DeleteBuffers(1, &mut output_ssbo);
+        gl::DeleteBuffers(1, &mut offsets_buffer);
     }
 }
 
 fn main() {
+    let up = glm::vec3(0., 0., 1.);
+
     let (ctx, event_loop) = make_gl_ctx_and_event_loop();
     init_opengl(&ctx);
 
@@ -407,24 +398,13 @@ fn main() {
         .unwrap()
     };
 
-    let offsets_program = {
-        let basic_compute_shader = shader::Shader::from_source(
-            &CString::new(include_str!(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/shaders/basic.comp"
-            )))
-            .unwrap(),
-            gl::COMPUTE_SHADER,
-        )
-        .unwrap();
-
-        program::Program::new(vec![(basic_compute_shader, gl::COMPUTE_SHADER)]).unwrap()
-    };
-
     // Load texture
-    let texture_image = image::open("textures/mossy_cobblestone.png")
-        .unwrap()
-        .to_rgb();
+    let texture_image = image::open(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/textures/mossy_cobblestone.png"
+    ))
+    .unwrap()
+    .to_rgb();
     let texture_width = texture_image.width();
     let texture_height = texture_image.height();
 
@@ -465,7 +445,7 @@ fn main() {
     };
 
     // Initial camera position
-    let mut camera_pos = glm::vec3(0., -5., 2.);
+    let mut camera_pos = glm::vec3(-1., -1., 0.);
 
     // Initial camera orientation
     let mut last_camera_front = glm::vec3(0., 1., 0.);
@@ -492,22 +472,36 @@ fn main() {
                 event: WindowEvent::RedrawRequested,
                 ..
             } => {
-                use std::time::Instant;
-                let now = Instant::now();
-                draw(
-                    pitch,
-                    yaw,
-                    &mut last_camera_front,
-                    camera_pos,
-                    &ctx,
-                    vao,
-                    cube_vertices_vbo,
-                    texture,
-                    &offsets_program,
-                    &drawing_program,
-                    &chunk,
-                );
-                println!("{} ms", now.elapsed().as_micros() as f32 / 1000.);
+                unsafe {
+                    let mut query = 0;
+                    gl::GenQueries(1, &mut query);
+                    gl::BeginQuery(gl::TIME_ELAPSED, query);
+                    use std::time::Instant;
+                    let now = Instant::now();
+                    draw(
+                        pitch,
+                        yaw,
+                        &mut last_camera_front,
+                        camera_pos,
+                        &ctx,
+                        vao,
+                        cube_vertices_vbo,
+                        texture,
+                        &drawing_program,
+                        &chunk,
+                    );
+                    let cpu_time = now.elapsed().as_micros() as f32 / 1000.;
+                    gl::EndQuery(gl::TIME_ELAPSED);
+                    let mut gpu_time = 0;
+                    gl::GetQueryObjectiv(query, gl::QUERY_RESULT, &mut gpu_time);
+                    gl::DeleteQueries(1, &query as *const _);
+
+                    println!(
+                        "CPU: {:.2} ms, GPU: {:.2} ms",
+                        cpu_time,
+                        gpu_time as f64 / 1_000_000.0
+                    );
+                }
                 ctx.swap_buffers().unwrap();
             }
             Event::WindowEvent {
@@ -568,9 +562,9 @@ fn main() {
                     camera_pos = camera_pos + direction;
                 }
                 glutin::event::VirtualKeyCode::A => {
-                    let mut direction = glm::cross(&last_camera_front, &glm::vec3(0., 0., 1.));
-                    direction.z = 0.;
-                    let direction = glm::normalize(&direction);
+                    let mut right = glm::cross(&last_camera_front, &up);
+                    right.z = 0.;
+                    let direction = glm::normalize(&right);
                     camera_pos = camera_pos - direction;
                 }
                 glutin::event::VirtualKeyCode::S => {
@@ -580,13 +574,13 @@ fn main() {
                     camera_pos = camera_pos - direction;
                 }
                 glutin::event::VirtualKeyCode::D => {
-                    let mut direction = glm::cross(&last_camera_front, &glm::vec3(0., 0., 1.));
-                    direction.z = 0.;
-                    let direction = glm::normalize(&direction);
+                    let mut right = glm::cross(&last_camera_front, &up);
+                    right.z = 0.;
+                    let direction = glm::normalize(&right);
                     camera_pos = camera_pos + direction;
                 }
                 glutin::event::VirtualKeyCode::Space => {
-                    camera_pos = camera_pos + glm::vec3(0., 0., 1.);
+                    camera_pos = camera_pos + up;
                 }
                 glutin::event::VirtualKeyCode::C => {
                     camera_pos = camera_pos + glm::vec3(0., 0., -1.);
