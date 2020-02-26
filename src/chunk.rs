@@ -7,9 +7,10 @@ pub struct Chunk {
     pub blocks: Vec<GLuint>,
 }
 
-pub const CHUNK_X_SIZE: GLuint = 100;
-pub const CHUNK_Y_SIZE: GLuint = 100;
-pub const CHUNK_Z_SIZE: GLuint = 100;
+pub const CHUNK_X_SIZE: GLuint = 192;
+pub const CHUNK_Y_SIZE: GLuint = 192;
+pub const CHUNK_Z_SIZE: GLuint = 128;
+pub const CHUNK_BLOCKS: usize = (CHUNK_X_SIZE * CHUNK_Y_SIZE * CHUNK_Z_SIZE) as usize;
 
 impl Chunk {
     // TODO(andrea): make this much much cooler.

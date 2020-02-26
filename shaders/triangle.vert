@@ -2,7 +2,7 @@
 
 layout (location = 0) in vec3 in_position;
 layout (location = 1) in vec2 in_texture_uv;
-layout (location = 2) in vec4 view_offset;
+layout (location = 2) in vec3 view_offset;
 
 layout (location = 0) uniform mat4 mvp;
 

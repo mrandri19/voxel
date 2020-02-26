@@ -10,7 +10,7 @@ mod program;
 mod shader;
 mod vertex;
 
-use chunk::{Chunk, CHUNK_X_SIZE, CHUNK_Y_SIZE, CHUNK_Z_SIZE, COBBLESTONE};
+use chunk::{Chunk, CHUNK_BLOCKS, CHUNK_X_SIZE, CHUNK_Y_SIZE, CHUNK_Z_SIZE, COBBLESTONE};
 use program::Program;
 use shader::Shader;
 use vertex::{cube, Vertex};
@@ -22,7 +22,7 @@ const INITIAL_WIDTH: u32 = 1920;
 const INITIAL_HEIGHT: u32 = 1920;
 
 const NEAR_DISTANCE: f32 = 0.1;
-const FAR_DISTANCE: f32 = 100.;
+const FAR_DISTANCE: f32 = 200.;
 
 fn degrees_to_radians(degrees: f32) -> f32 {
     degrees * glm::pi::<f32>() / 180.
@@ -103,13 +103,11 @@ fn draw(
     // ************************************************************************
     // Use raycasting to figure out which cubes to display
 
-    let mut offsets: Vec<[GLfloat; 4]> =
-        Vec::with_capacity((CHUNK_X_SIZE * CHUNK_Y_SIZE * CHUNK_Z_SIZE) as usize);
+    let mut offsets: Vec<[GLfloat; 3]> = Vec::with_capacity(CHUNK_BLOCKS);
 
-    let mut block_used: [bool; (CHUNK_X_SIZE * CHUNK_Y_SIZE * CHUNK_Z_SIZE) as usize] =
-        [false; (CHUNK_X_SIZE * CHUNK_Y_SIZE * CHUNK_Z_SIZE) as usize];
+    let mut block_used: [bool; CHUNK_BLOCKS] = [false; CHUNK_BLOCKS];
 
-    let far_height = 2. * ((1.1 * fov) / 2.).tan() * FAR_DISTANCE;
+    let far_height = 2. * ((fov) / 2.).tan() * FAR_DISTANCE;
     let far_width = aspect_ratio * far_height;
 
     let right = glm::cross(&camera_ray, &up).normalize();
@@ -117,7 +115,7 @@ fn draw(
     let fc = camera_pos + camera_ray * FAR_DISTANCE;
     let fbl = fc - (camera_up * far_height / 2.) - (right * far_width / 2.);
 
-    let max_u = 300;
+    let max_u = 320;
     let max_v = 180;
     for v in 0..max_v {
         for u in 0..max_u {
@@ -196,7 +194,7 @@ fn draw(
                     block_used
                         [(z_ * CHUNK_Y_SIZE * CHUNK_X_SIZE + y_ * CHUNK_X_SIZE + x_) as usize] =
                         true;
-                    offsets.push([x, y, z, 1.]);
+                    offsets.push([x, y, z]);
                     break;
                 }
             }
@@ -212,7 +210,7 @@ fn draw(
         gl::BindBuffer(gl::ARRAY_BUFFER, offsets_buffer);
         gl::BufferData(
             gl::ARRAY_BUFFER,
-            (offsets.len() * std::mem::size_of::<[GLfloat; 4]>()) as GLsizeiptr,
+            (offsets.len() * std::mem::size_of::<[GLfloat; 3]>()) as GLsizeiptr,
             offsets.as_ptr() as *const GLvoid,
             gl::DYNAMIC_DRAW,
         );
@@ -222,10 +220,10 @@ fn draw(
         gl::EnableVertexArrayAttrib(vao, location);
         gl::VertexAttribPointer(
             location,
-            4,
+            3,
             gl::FLOAT,
             gl::FALSE,
-            (4 * std::mem::size_of::<f32>()) as GLsizei,
+            (3 * std::mem::size_of::<f32>()) as GLsizei,
             std::ptr::null(),
         );
         gl::BindBuffer(gl::ARRAY_BUFFER, 0);
@@ -380,7 +378,7 @@ fn main() {
         gl::TextureParameteri(texture, gl::TEXTURE_MAG_FILTER, gl::NEAREST as GLint);
     };
 
-    let mut last_camera_pos = glm::vec3(3., 3., 5.);
+    let mut last_camera_pos = glm::vec3(3., 3., 15.);
     let mut last_camera_ray = glm::vec3(0., 1., 0.);
     let mut last_yaw = 0.;
     let mut last_pitch = 0.;
