@@ -5,24 +5,25 @@ extern crate nalgebra_glm as glm;
 use glfw::{Action, Context, Key};
 
 mod chunk;
+mod constants;
 mod debug_message_callback;
+mod measure_elapsed;
 mod program;
+mod raycasting;
 mod shader;
+mod texture;
 mod vertex;
 
-use chunk::{Chunk, CHUNK_BLOCKS, CHUNK_X_SIZE, CHUNK_Y_SIZE, CHUNK_Z_SIZE, COBBLESTONE};
+use chunk::Chunk;
+use constants::*;
+use measure_elapsed::measure_elapsed;
 use program::Program;
+use raycasting::raycast;
 use shader::Shader;
+use texture::Texture;
 use vertex::{cube, Vertex};
 
 use std::ffi::CString;
-
-const MOUSE_SENSITIVITY: f32 = 0.1;
-const INITIAL_WIDTH: u32 = 1920;
-const INITIAL_HEIGHT: u32 = 1920;
-
-const NEAR_DISTANCE: f32 = 0.1;
-const FAR_DISTANCE: f32 = 128.;
 
 fn degrees_to_radians(degrees: f32) -> f32 {
     degrees * glm::pi::<f32>() / 180.
@@ -31,15 +32,15 @@ fn degrees_to_radians(degrees: f32) -> f32 {
 fn draw(
     camera_ray: &glm::Vec3,
     camera_pos: &glm::Vec3,
+    up: &glm::Vec3,
     width: f64,
     height: f64,
     cube_vao: GLuint,
     cube_bo: GLuint,
-    texture: GLuint,
+    texture: &Texture,
     drawing_program: &Program,
     chunk: &Chunk,
 ) {
-    let up: glm::TVec3<GLfloat> = glm::vec3(0., 0., 1.);
     // ************************************************************************
     // Clear screen and depth buffer
 
@@ -111,11 +112,16 @@ fn draw(
     // ************************************************************************
     // Bind textures
 
-
     let texture_uniform_location = 3;
     let texture_unit = 0;
-    unsafe { gl::BindTextureUnit(texture_unit, texture) };
-    unsafe { gl::ProgramUniform1i(drawing_program.get_id(), texture_uniform_location, texture_unit as i32) };
+    unsafe { gl::BindTextureUnit(texture_unit, texture.name()) };
+    unsafe {
+        gl::ProgramUniform1i(
+            drawing_program.get_id(),
+            texture_uniform_location,
+            texture_unit as i32,
+        )
+    };
 
     // ************************************************************************
     // Add cube vertices to their vbo and vao descriptor
@@ -134,103 +140,7 @@ fn draw(
 
     // ************************************************************************
     // Use raycasting to figure out which cubes to display
-    let mut offsets: Vec<[GLfloat; 3]> = Vec::with_capacity(CHUNK_BLOCKS);
-
-    let mut block_used: [bool; CHUNK_BLOCKS] = [false; CHUNK_BLOCKS];
-
-    let far_height = 2. * ((1.1 * fov) / 2.).tan() * FAR_DISTANCE;
-    let far_width = aspect_ratio * far_height;
-
-    let right = glm::cross(&camera_ray, &up).normalize();
-    let camera_up = glm::cross(&right, &camera_ray).normalize();
-    let fc = camera_pos + camera_ray * FAR_DISTANCE;
-    let fbl = fc - (camera_up * far_height / 2.) - (right * far_width / 2.);
-
-    let max_u = 320;
-    let max_v = 180;
-    for v in 0..max_v {
-        for u in 0..max_u {
-            let du = u as GLfloat / max_u as GLfloat;
-            let dv = v as GLfloat / max_v as GLfloat;
-            // initialization step
-
-            // ray starting position
-            let ray_start = camera_pos;
-            // ray direction
-            let ray_direction =
-                (fbl + camera_up * far_height * dv + right * far_width * du) - ray_start;
-            let ray_direction = ray_direction.normalize();
-            // voxel on which the ray origin is found
-            let mut ray_voxel = glm::floor(&camera_pos);
-            // how much to increment as we cross voxel boundaries
-            let step = glm::sign(&ray_direction);
-            // the value of t at which the ray crosses the fist vertical voxel boundary
-            let mut t_max = ((ray_voxel + step) - ray_start)
-                .component_div(&ray_direction.add_scalar(0.0000001));
-            // how far along the ray we must move for each component of such movement to equal the width of a voxel
-            let t_delta = (glm::vec3(1., 1., 1.)
-                .component_div(&ray_direction.add_scalar(0.0000001)))
-            .component_mul(&step);
-
-            // traversal step
-            for _ in 0..(FAR_DISTANCE * (3.0f32).sqrt() + 1.) as u32 {
-                if t_max.x < t_max.y {
-                    if t_max.x < t_max.z {
-                        ray_voxel.x += step.x;
-                        t_max.x += t_delta.x;
-                    } else {
-                        ray_voxel.z += step.z;
-                        t_max.z += t_delta.z;
-                    }
-                } else {
-                    if t_max.y < t_max.z {
-                        ray_voxel.y += step.y;
-                        t_max.y += t_delta.y;
-                    } else {
-                        ray_voxel.z += step.z;
-                        t_max.z += t_delta.z;
-                    }
-                }
-
-                if ray_voxel.x >= (CHUNK_X_SIZE as f32) {
-                    break;
-                }
-                if ray_voxel.y >= (CHUNK_Y_SIZE as f32) {
-                    break;
-                }
-                if ray_voxel.z >= (CHUNK_Z_SIZE as f32) {
-                    break;
-                }
-                if ray_voxel.x < 0. {
-                    break;
-                }
-                if ray_voxel.y < 0. {
-                    break;
-                }
-                if ray_voxel.z < 0. {
-                    break;
-                }
-
-                let x_ = ray_voxel.x as GLuint;
-                let y_ = ray_voxel.y as GLuint;
-                let z_ = ray_voxel.z as GLuint;
-                let x = ray_voxel.x;
-                let y = ray_voxel.y;
-                let z = ray_voxel.z;
-
-                if chunk.get(x_, y_, z_) == COBBLESTONE
-                    && !block_used
-                        [(z_ * CHUNK_Y_SIZE * CHUNK_X_SIZE + y_ * CHUNK_X_SIZE + x_) as usize]
-                {
-                    block_used
-                        [(z_ * CHUNK_Y_SIZE * CHUNK_X_SIZE + y_ * CHUNK_X_SIZE + x_) as usize] =
-                        true;
-                    offsets.push([x, y, z]);
-                    break;
-                }
-            }
-        }
-    }
+    let offsets = raycast(aspect_ratio, fov, camera_pos, camera_ray, &up, chunk);
 
     // ************************************************************************
     // Create cubes offsets buffer and bind them to be used for instanced drawing
@@ -280,16 +190,15 @@ fn draw(
 }
 
 fn main() {
-    let up = glm::vec3(0., 0., 1.);
-
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
     glfw.window_hint(glfw::WindowHint::Resizable(true));
-    let (mut window, events) = glfw.with_connected_monitors_mut(|g, monitors| {
+    let (mut window, events) = glfw
+        .with_connected_monitors_mut(|g, _monitors| {
             g.create_window(
                 INITIAL_WIDTH,
                 INITIAL_HEIGHT,
                 "Hello this is window",
-                glfw::WindowMode::Windowed
+                glfw::WindowMode::Windowed,
             )
         })
         .expect("Failed to create GLFW window.");
@@ -333,12 +242,11 @@ fn main() {
     unsafe { gl::BindVertexArray(cube_vao) };
 
     // Create and use shader program
-
     let drawing_program = {
         let vertex_shader = Shader::from_source(
             &CString::new(include_str!(concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/shaders/triangle.vert"
+                "/shaders/triangle.vert.glsl"
             )))
             .unwrap(),
             gl::VERTEX_SHADER,
@@ -347,7 +255,7 @@ fn main() {
         let fragment_shader = Shader::from_source(
             &CString::new(include_str!(concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/shaders/triangle.frag"
+                "/shaders/triangle.frag.glsl"
             )))
             .unwrap(),
             gl::FRAGMENT_SHADER,
@@ -360,52 +268,17 @@ fn main() {
         .unwrap()
     };
 
-    // Load texture
-    let texture_image = image::open(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/textures/mossy_cobblestone.png"
-    ))
-    .unwrap()
-    .to_rgb();
-    let texture_width = texture_image.width();
-    let texture_height = texture_image.height();
-
     // Create texture
-    let mut texture = 0;
-    unsafe {
-        gl::CreateTextures(gl::TEXTURE_2D, 1, &mut texture);
-        gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
+    let mossy_cobblestone_texture = Texture::new(
+        image::open(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/textures/mossy_cobblestone.png"
+        ))
+        .unwrap()
+        .to_rgb(),
+    );
 
-        gl::TextureStorage2D(
-            texture,
-            4,
-            gl::RGB8,
-            texture_width as GLsizei,
-            texture_height as GLsizei,
-        );
-        gl::TextureSubImage2D(
-            texture,
-            0,
-            0,
-            0,
-            texture_width as GLsizei,
-            texture_height as GLsizei,
-            gl::RGB,
-            gl::UNSIGNED_BYTE,
-            texture_image.into_raw().as_ptr() as *const GLvoid,
-        );
-
-        gl::GenerateTextureMipmap(texture);
-        gl::TextureParameteri(texture, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_BORDER as GLint);
-        gl::TextureParameteri(texture, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_BORDER as GLint);
-        gl::TextureParameteri(
-            texture,
-            gl::TEXTURE_MIN_FILTER,
-            gl::NEAREST_MIPMAP_NEAREST as GLint,
-        );
-        gl::TextureParameteri(texture, gl::TEXTURE_MAG_FILTER, gl::NEAREST as GLint);
-    };
-
+    let up = glm::vec3(0., 0., 1.);
     let mut last_camera_pos = glm::vec3(3., 3., 15.);
     let mut last_camera_ray = glm::vec3(0., 1., 0.);
     let mut last_yaw = 0.;
@@ -494,39 +367,21 @@ fn main() {
                 _ => (),
             }
         }
-        unsafe {
-            let mut query = 0;
-            gl::GenQueries(1, &mut query);
-            gl::BeginQuery(gl::TIME_ELAPSED, query);
 
-            use std::time::Instant;
-            let now = Instant::now();
-
+        measure_elapsed(|| {
             draw(
                 &last_camera_ray,
                 &last_camera_pos,
+                &up,
                 last_width as f64,
                 last_height as f64,
                 cube_vao,
                 cube_bo,
-                texture,
+                &mossy_cobblestone_texture,
                 &drawing_program,
                 &chunk,
             );
-
-            let cpu_time = now.elapsed().as_micros() as f32 / 1000.;
-
-            gl::EndQuery(gl::TIME_ELAPSED);
-            let mut gpu_time = 0;
-            gl::GetQueryObjectiv(query, gl::QUERY_RESULT, &mut gpu_time);
-            gl::DeleteQueries(1, &query as *const _);
-
-            println!(
-                "CPU: {:.2} ms, GPU: {:.2} ms",
-                cpu_time,
-                gpu_time as f64 / 1_000_000.0
-            );
-        }
+        });
 
         window.swap_buffers()
     }

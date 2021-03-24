@@ -48,8 +48,8 @@ void main()
     float specular_strength = 0.5;
     vec3 model_to_camera = normalize(camera_position - in_model_position);
     vec3 reflect_direction = reflect(-diffuse_light_direction, in_normal);
-    float spec = pow(max(dot(model_to_camera, reflect_direction), 0.0), 16);
-    vec3 specular_color = specular_strength * spec * light_color;
+    float specular_intensity = pow(max(dot(model_to_camera, reflect_direction), 0.0), 16);
+    vec3 specular_color = specular_strength * specular_intensity * light_color;
 
     // Sum up all light contributions
     vec3 result = (ambient_color + diffuse_color + specular_color) * vec3(texture(tex, in_texture_uv));
