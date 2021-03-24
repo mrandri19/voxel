@@ -46,11 +46,30 @@ impl Program {
 
         Ok(Program { id: program })
     }
+
     pub fn use_(&self) {
-        unsafe { gl::UseProgram(self.get_id()) };
+        unsafe { gl::UseProgram(self.id) };
     }
-    pub fn get_id(&self) -> GLuint {
-        self.id
+
+    pub fn set_uniform_mat4(&self, location: GLint, matrix: &glm::Mat4) {
+        unsafe {
+            gl::ProgramUniformMatrix4fv(
+                self.id,
+                location,
+                1,
+                gl::FALSE,
+                glm::value_ptr(&matrix).as_ptr(),
+            )
+        };
+    }
+
+    pub fn set_uniform_vec3(&self, location: GLint, vector: &glm::Vec3) {
+        unsafe { gl::ProgramUniform3fv(self.id, location, 1, glm::value_ptr(&vector).as_ptr()) };
+    }
+
+    #[allow(non_snake_case)]
+    pub fn set_uniform_sampler2D(&self, location: GLint, texture_unit: GLuint) {
+        unsafe { gl::ProgramUniform1i(self.id, location, texture_unit as GLint) };
     }
 }
 

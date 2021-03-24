@@ -37,20 +37,19 @@ fn draw(
     height: f64,
     cube_vao: GLuint,
     cube_bo: GLuint,
-    texture: &Texture,
-    drawing_program: &Program,
+    mossy_cobblestone_texture: &Texture,
+    textured_phong_cube_program: &Program,
     chunk: &Chunk,
 ) {
     // ************************************************************************
     // Clear screen and depth buffer
-
     unsafe {
         gl::ClearColor(0., 0., 0., 1.);
         gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
     }
 
     // ************************************************************************
-    // Create model, view, projection matrices
+    // Create model, view, projection matrices and pass them to shaders
 
     let model: glm::Mat4 = glm::identity();
     let model = glm::translate(&model, &glm::vec3(0., 0., 0.));
@@ -65,63 +64,26 @@ fn draw(
     let aspect_ratio = (width / height) as f32;
     let projection: glm::Mat4 = glm::perspective(aspect_ratio, fov, NEAR_DISTANCE, FAR_DISTANCE);
 
-    // Pass the matrices as uniforms
-    let model_uniform_location = 0;
-    unsafe {
-        gl::ProgramUniformMatrix4fv(
-            drawing_program.get_id(),
-            model_uniform_location,
-            1,
-            gl::FALSE,
-            glm::value_ptr(&model).as_ptr(),
-        )
-    };
-
-    let view_uniform_location = 1;
-    unsafe {
-        gl::ProgramUniformMatrix4fv(
-            drawing_program.get_id(),
-            view_uniform_location,
-            1,
-            gl::FALSE,
-            glm::value_ptr(&view).as_ptr(),
-        )
-    };
-
-    let projection_uniform_location = 2;
-    unsafe {
-        gl::ProgramUniformMatrix4fv(
-            drawing_program.get_id(),
-            projection_uniform_location,
-            1,
-            gl::FALSE,
-            glm::value_ptr(&projection).as_ptr(),
-        )
-    };
-
-    let camera_position_uniform_location = 4;
-    unsafe {
-        gl::ProgramUniform3fv(
-            drawing_program.get_id(),
-            camera_position_uniform_location,
-            1,
-            glm::value_ptr(&camera_pos).as_ptr(),
-        )
-    };
+    // Pass the MVP matrices as uniforms
+    textured_phong_cube_program.set_uniform_mat4(0, &model);
+    textured_phong_cube_program.set_uniform_mat4(1, &view);
+    textured_phong_cube_program.set_uniform_mat4(2, &projection);
 
     // ************************************************************************
-    // Bind textures
+    // Bind textures and pass them to shaders
 
-    let texture_uniform_location = 3;
-    let texture_unit = 0;
-    unsafe { gl::BindTextureUnit(texture_unit, texture.name()) };
-    unsafe {
-        gl::ProgramUniform1i(
-            drawing_program.get_id(),
-            texture_uniform_location,
-            texture_unit as i32,
-        )
-    };
+    let texture_unit = 12;
+    mossy_cobblestone_texture.bind(texture_unit);
+
+    textured_phong_cube_program.set_uniform_sampler2D(3, texture_unit);
+
+    // ************************************************************************
+    // Pass additional data to shaders
+
+    textured_phong_cube_program.set_uniform_vec3(4, &camera_pos);
+
+    let light_position = glm::vec3(20., 20., 20.);
+    textured_phong_cube_program.set_uniform_vec3(5, &light_position);
 
     // ************************************************************************
     // Add cube vertices to their vbo and vao descriptor
@@ -140,7 +102,10 @@ fn draw(
 
     // ************************************************************************
     // Use raycasting to figure out which cubes to display
-    let offsets = raycast(aspect_ratio, fov, camera_pos, camera_ray, &up, chunk);
+    let mut offsets = raycast(aspect_ratio, fov, camera_pos, camera_ray, &up, chunk);
+
+    offsets.push(light_position.into());
+    // Vec<[GLfloat; 3]>
 
     // ************************************************************************
     // Create cubes offsets buffer and bind them to be used for instanced drawing
@@ -175,7 +140,7 @@ fn draw(
     // ************************************************************************
     // Draw Instanced
 
-    drawing_program.use_();
+    textured_phong_cube_program.use_();
 
     unsafe {
         gl::DrawArraysInstanced(

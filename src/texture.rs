@@ -4,8 +4,8 @@ pub struct Texture {
     name: GLuint,
 }
 impl Texture {
-    pub fn name(&self) -> GLuint {
-        self.name
+    pub fn bind(&self, texture_unit: GLuint) {
+        unsafe { gl::BindTextureUnit(texture_unit, self.name) };
     }
     pub fn new(texture_image: RgbImage) -> Self {
         let texture_width = texture_image.width();
@@ -50,15 +50,9 @@ impl Texture {
                 gl::TEXTURE_MIN_FILTER,
                 gl::NEAREST_MIPMAP_NEAREST as GLint,
             );
-            gl::TextureParameteri(
-                texture_name,
-                gl::TEXTURE_MAG_FILTER,
-                gl::NEAREST as GLint,
-            );
+            gl::TextureParameteri(texture_name, gl::TEXTURE_MAG_FILTER, gl::NEAREST as GLint);
         };
 
-        Self {
-            name: texture_name,
-        }
+        Self { name: texture_name }
     }
 }
