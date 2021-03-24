@@ -98,12 +98,24 @@ fn draw(
         )
     };
 
+    let camera_position_uniform_location = 4;
+    unsafe {
+        gl::ProgramUniform3fv(
+            drawing_program.get_id(),
+            camera_position_uniform_location,
+            1,
+            glm::value_ptr(&camera_pos).as_ptr(),
+        )
+    };
+
     // ************************************************************************
     // Bind textures
 
+
+    let texture_uniform_location = 3;
     let texture_unit = 0;
     unsafe { gl::BindTextureUnit(texture_unit, texture) };
-    unsafe { gl::ProgramUniform1i(drawing_program.get_id(), 3, texture_unit as i32) };
+    unsafe { gl::ProgramUniform1i(drawing_program.get_id(), texture_uniform_location, texture_unit as i32) };
 
     // ************************************************************************
     // Add cube vertices to their vbo and vao descriptor
@@ -272,15 +284,12 @@ fn main() {
 
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
     glfw.window_hint(glfw::WindowHint::Resizable(true));
-    let (mut window, events) = glfw
-        .with_primary_monitor(|g, m| {
+    let (mut window, events) = glfw.with_connected_monitors_mut(|g, monitors| {
             g.create_window(
                 INITIAL_WIDTH,
                 INITIAL_HEIGHT,
                 "Hello this is window",
-                m.map_or(glfw::WindowMode::Windowed, |m| {
-                    glfw::WindowMode::FullScreen(m)
-                }),
+                glfw::WindowMode::Windowed
             )
         })
         .expect("Failed to create GLFW window.");
