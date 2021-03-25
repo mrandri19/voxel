@@ -23,13 +23,14 @@ float K_d = 0.0045;
 float K_q = 0.00075;
 
 void main() {
-  vec3 in_normal = mat3(transpose(inverse(model))) * normalize(in_normal);
+  vec3 in_normal = normalize(in_normal);
 
+  // ***************************************************************************
   // Ambient lighting
   vec3 ambient_color = ambient_strength * light_color;
 
+  // ***************************************************************************
   // Diffuse lighting
-  // The light goes from the block's position to the source
   float diffuse_light_distance = length(light_position - in_model_position);
   vec3 diffuse_light_direction = normalize(light_position - in_model_position);
 
@@ -40,18 +41,21 @@ void main() {
       clamp(dot(in_normal, diffuse_light_direction), 0., 1.);
   vec3 diffuse_color = diffuse_intensity * light_color;
 
+  // ***************************************************************************
   // Specular lighting
   float specular_strength = 0.5;
   vec3 model_to_camera = normalize(camera_position - in_model_position);
   vec3 reflect_direction = reflect(-diffuse_light_direction, in_normal);
   float specular_intensity =
-      pow(max(dot(model_to_camera, reflect_direction), 0.0), 16);
+      pow(max(dot(model_to_camera, reflect_direction), 0.0), 32);
   vec3 specular_color = specular_strength * specular_intensity * light_color;
 
+  // ***************************************************************************
   // Sum up all light contributions
   vec3 result = (ambient_color + diffuse_color + specular_color) *
                 vec3(texture(tex, in_texture_uv));
 
+  // ***************************************************************************
   // Gamma correction
   out_color = vec4(pow(result, vec3(1. / 2.2)), 1.0);
 }

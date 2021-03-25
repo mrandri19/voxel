@@ -40,6 +40,7 @@ fn draw(
     mossy_cobblestone_texture: &Texture,
     textured_phong_cube_program: &Program,
     chunk: &Chunk,
+    time: f64,
 ) {
     // ************************************************************************
     // Clear screen and depth buffer
@@ -52,7 +53,6 @@ fn draw(
     // Create model, view, projection matrices and pass them to shaders
 
     let model: glm::Mat4 = glm::identity();
-    let model = glm::translate(&model, &glm::vec3(0., 0., 0.));
 
     let view: glm::Mat4 = glm::look_at(
         &camera_pos,                // eye: position of the camera
@@ -82,7 +82,11 @@ fn draw(
 
     textured_phong_cube_program.set_uniform_vec3(4, &camera_pos);
 
-    let light_position = glm::vec3(20., 20., 20.);
+    let light_position = glm::vec3(
+        20.0 + 10.0 * (2.0 * 3.14 * 5e-3 * time).cos() as f32,
+        20.0 + 10.0 * (2.0 * 3.14 * 5e-3 * time).sin() as f32,
+        20.,
+    );
     textured_phong_cube_program.set_uniform_vec3(5, &light_position);
 
     // ************************************************************************
@@ -104,8 +108,10 @@ fn draw(
     // Use raycasting to figure out which cubes to display
     let mut offsets = raycast(aspect_ratio, fov, camera_pos, camera_ray, &up, chunk);
 
+    // ************************************************************************
+    // Add an additional cube to draw the light
+    // TODO(Andrea): use a different program to draw this
     offsets.push(light_position.into());
-    // Vec<[GLfloat; 3]>
 
     // ************************************************************************
     // Create cubes offsets buffer and bind them to be used for instanced drawing
@@ -132,6 +138,7 @@ fn draw(
             (3 * std::mem::size_of::<f32>()) as GLsizei,
             std::ptr::null(),
         );
+
         gl::BindBuffer(gl::ARRAY_BUFFER, 0);
 
         gl::VertexAttribDivisor(location, 1);
@@ -253,6 +260,8 @@ fn main() {
     let mut last_width = INITIAL_WIDTH;
     let mut last_height = INITIAL_HEIGHT;
 
+    let mut time = 0.0;
+
     while !window.should_close() {
         glfw.poll_events();
         for (_, event) in glfw::flush_messages(&events) {
@@ -345,8 +354,11 @@ fn main() {
                 &mossy_cobblestone_texture,
                 &drawing_program,
                 &chunk,
+                time,
             );
         });
+
+        time += 1.0;
 
         window.swap_buffers()
     }
