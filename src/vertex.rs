@@ -91,3 +91,53 @@ pub fn cube() -> Vec<Vertex> {
         Vertex::new([-0.5, 0.5, 0.5], [0.0, 0.0], [0.0, 1.0, 0.0]),  // bottom-left
     ];
 }
+
+pub fn skybox_cube() -> Vec<Vertex> {
+    // The vertices in 1 -> 3 -> 2 rather than 1 -> 2 -> 3, and the normals are
+    // inverted. We always are inside the skybox cube so the backface culling
+    // would delete everything if we kept the same order as a regular cube
+    return vec![
+        // Back face
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 0.0], [0.0, 0.0, 1.0]), // Bottom-left
+        Vertex::new([0.5, -0.5, -0.5], [1.0, 0.0], [0.0, 0.0, 1.0]),  // bottom-right
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0], [0.0, 0.0, 1.0]),   // top-right
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0], [0.0, 0.0, 1.0]),   // top-right
+        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0], [0.0, 0.0, 1.0]),  // top-left
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 0.0], [0.0, 0.0, 1.0]), // bottom-left
+        // Front face
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0], [0.0, 0.0, -1.0]), // bottom-left
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 1.0], [0.0, 0.0, -1.0]),   // top-right
+        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0], [0.0, 0.0, -1.0]),  // bottom-right
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 1.0], [0.0, 0.0, -1.0]),   // top-right
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0], [0.0, 0.0, -1.0]), // bottom-left
+        Vertex::new([-0.5, 0.5, 0.5], [0.0, 1.0], [0.0, 0.0, -1.0]),  // top-left
+        // Left face
+        Vertex::new([-0.5, 0.5, 0.5], [1.0, 0.0], [1.0, 0.0, 0.0]), // top-right
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0], [1.0, 0.0, 0.0]), // bottom-left
+        Vertex::new([-0.5, 0.5, -0.5], [1.0, 1.0], [1.0, 0.0, 0.0]), // top-left
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0], [1.0, 0.0, 0.0]), // bottom-left
+        Vertex::new([-0.5, 0.5, 0.5], [1.0, 0.0], [1.0, 0.0, 0.0]), // top-right
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0], [1.0, 0.0, 0.0]), // bottom-right
+        // Right face
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0], [-1.0, 0.0, 0.0]), // top-left
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0], [-1.0, 0.0, 0.0]), // top-right
+        Vertex::new([0.5, -0.5, -0.5], [0.0, 1.0], [-1.0, 0.0, 0.0]), // bottom-right
+        Vertex::new([0.5, -0.5, -0.5], [0.0, 1.0], [-1.0, 0.0, 0.0]), // bottom-right
+        Vertex::new([0.5, -0.5, 0.5], [0.0, 0.0], [-1.0, 0.0, 0.0]), // bottom-left
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0], [-1.0, 0.0, 0.0]), // top-left
+        // Bottom face
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0], [0.0, 1.0, 0.0]), // top-right
+        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0], [0.0, 1.0, 0.0]),   // bottom-left
+        Vertex::new([0.5, -0.5, -0.5], [1.0, 1.0], [0.0, 1.0, 0.0]),  // top-left
+        Vertex::new([0.5, -0.5, 0.5], [1.0, 0.0], [0.0, 1.0, 0.0]),   // bottom-left
+        Vertex::new([-0.5, -0.5, -0.5], [0.0, 1.0], [0.0, 1.0, 0.0]), // top-right
+        Vertex::new([-0.5, -0.5, 0.5], [0.0, 0.0], [0.0, 1.0, 0.0]),  // bottom-right
+        // Top face
+        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0], [0.0, -1.0, 0.0]), // top-left
+        Vertex::new([0.5, 0.5, -0.5], [1.0, 1.0], [0.0, -1.0, 0.0]),  // top-right
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0], [0.0, -1.0, 0.0]),   // bottom-right
+        Vertex::new([0.5, 0.5, 0.5], [1.0, 0.0], [0.0, -1.0, 0.0]),   // bottom-right
+        Vertex::new([-0.5, 0.5, 0.5], [0.0, 0.0], [0.0, -1.0, 0.0]),  // bottom-left
+        Vertex::new([-0.5, 0.5, -0.5], [0.0, 1.0], [0.0, -1.0, 0.0]), // top-left
+    ];
+}

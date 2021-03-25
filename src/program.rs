@@ -68,7 +68,7 @@ impl Program {
     }
 
     #[allow(non_snake_case)]
-    pub fn set_uniform_sampler2D(&self, location: GLint, texture_unit: GLuint) {
+    pub fn set_uniform_sampler(&self, location: GLint, texture_unit: GLuint) {
         unsafe { gl::ProgramUniform1i(self.id, location, texture_unit as GLint) };
     }
 }

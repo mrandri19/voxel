@@ -4,14 +4,14 @@ layout(location = 0) in vec2 in_texture_uv;
 layout(location = 1) in vec3 in_normal;
 layout(location = 2) in vec3 in_model_position;
 
-layout(location = 0) out vec4 out_color;
-
 layout(location = 0) uniform mat4 model;
 layout(location = 1) uniform mat4 view;
 layout(location = 2) uniform mat4 projection;
 layout(location = 3) uniform sampler2D tex;
 layout(location = 4) uniform vec3 camera_position;
 layout(location = 5) uniform vec3 light_position;
+
+layout(location = 0) out vec4 out_color;
 
 vec3 light_color = vec3(1., 1., 1.);
 
