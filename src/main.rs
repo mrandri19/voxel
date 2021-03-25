@@ -20,7 +20,7 @@ use measure_elapsed::measure_elapsed;
 use program::Program;
 use raycasting::raycast;
 use shader::Shader;
-use texture::Texture;
+use texture::{Texture2D, TextureCubeMap};
 use vertex::{cube, Vertex};
 
 use std::ffi::CString;
@@ -37,7 +37,8 @@ fn draw(
     height: f64,
     cube_vao: GLuint,
     cube_bo: GLuint,
-    mossy_cobblestone_texture: &Texture,
+    mossy_cobblestone_texture: &Texture2D,
+    sky_cubemap_texture: &TextureCubeMap,
     textured_phong_cube_program: &Program,
     chunk: &Chunk,
     time: f64,
@@ -72,10 +73,12 @@ fn draw(
     // ************************************************************************
     // Bind textures and pass them to shaders
 
-    let texture_unit = 12;
-    mossy_cobblestone_texture.bind(texture_unit);
+    let mossy_cobblestone_texture_unit = 12;
+    mossy_cobblestone_texture.bind(mossy_cobblestone_texture_unit);
+    textured_phong_cube_program.set_uniform_sampler2D(3, mossy_cobblestone_texture_unit);
 
-    textured_phong_cube_program.set_uniform_sampler2D(3, texture_unit);
+    let sky_cubemap_texture_unit = 7;
+    sky_cubemap_texture.bind(sky_cubemap_texture_unit);
 
     // ************************************************************************
     // Pass additional data to shaders
@@ -85,7 +88,7 @@ fn draw(
     let light_position = glm::vec3(
         20.0 + 10.0 * (2.0 * 3.14 * 5e-3 * time).cos() as f32,
         20.0 + 10.0 * (2.0 * 3.14 * 5e-3 * time).sin() as f32,
-        20.,
+        20.0 + 1.0 * (2.0 * 3.14 * 1e-2 * time).cos() as f32,
     );
     textured_phong_cube_program.set_uniform_vec3(5, &light_position);
 
@@ -241,7 +244,7 @@ fn main() {
     };
 
     // Create texture
-    let mossy_cobblestone_texture = Texture::new(
+    let mossy_cobblestone_texture = Texture2D::new(
         image::open(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/textures/mossy_cobblestone.png"
@@ -249,6 +252,45 @@ fn main() {
         .unwrap()
         .to_rgb(),
     );
+
+    let sky_cubemap_texture = TextureCubeMap::new([
+        image::open(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/textures/skybox/right.jpg"
+        ))
+        .unwrap()
+        .to_rgb(),
+        image::open(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/textures/skybox/left.jpg"
+        ))
+        .unwrap()
+        .to_rgb(),
+        image::open(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/textures/skybox/top.jpg"
+        ))
+        .unwrap()
+        .to_rgb(),
+        image::open(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/textures/skybox/bottom.jpg"
+        ))
+        .unwrap()
+        .to_rgb(),
+        image::open(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/textures/skybox/front.jpg"
+        ))
+        .unwrap()
+        .to_rgb(),
+        image::open(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/textures/skybox/back.jpg"
+        ))
+        .unwrap()
+        .to_rgb(),
+    ]);
 
     let up = glm::vec3(0., 0., 1.);
     let mut last_camera_pos = glm::vec3(3., 3., 15.);
@@ -352,6 +394,7 @@ fn main() {
                 cube_vao,
                 cube_bo,
                 &mossy_cobblestone_texture,
+                &sky_cubemap_texture,
                 &drawing_program,
                 &chunk,
                 time,
