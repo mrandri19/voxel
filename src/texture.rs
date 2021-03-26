@@ -80,6 +80,8 @@ impl TextureCubeMap {
 
             for (face, img) in texture_images.iter().enumerate() {
                 let img = img.clone();
+                // See the OpenGL 4.5 Core spec[0], page 212, paragraph 3
+                // [0]: https://www.khronos.org/registry/OpenGL/specs/gl/glspec45.core.pdf
                 gl::TextureSubImage3D(
                     texture_name,
                     0,

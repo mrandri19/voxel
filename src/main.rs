@@ -1,3 +1,7 @@
+// TODO(Andrea):
+// - Skybox far plane clipping
+// - Cazzo di compute shader
+
 use gl::types::*;
 
 extern crate nalgebra_glm as glm;
@@ -21,7 +25,7 @@ use program::Program;
 use raycasting::raycast;
 use shader::Shader;
 use texture::{Texture2D, TextureCubeMap};
-use vertex::{cube, skybox_cube, Vertex};
+use vertex::{cube, skybox_cube, Vertex, VertexUVNormal};
 
 use std::ffi::CString;
 
@@ -95,10 +99,18 @@ fn draw(
 
         skybox_program.use_();
 
-        let model: glm::Mat4 = glm::scale(&glm::identity(), &glm::vec3(60.0, 60.0, 60.0));
+        let model = glm::translate(
+            &glm::scale(
+                &glm::identity(),
+                &glm::vec3(FAR_DISTANCE * 1.0, FAR_DISTANCE * 1.0, FAR_DISTANCE * 1.0), // will be a 64x64x64 cube centered at (0,0,0)
+            ),
+            &glm::vec3(1.0 / 4., 1.0 / 4., 0.0),
+        );
 
         skybox_program.set_uniform_mat4(0, &model);
-        skybox_program.set_uniform_mat4(1, &view);
+        let view_no_translate = glm::mat3_to_mat4(&glm::mat4_to_mat3(&view));
+
+        skybox_program.set_uniform_mat4(1, &view_no_translate);
         skybox_program.set_uniform_mat4(2, &projection);
 
         let sky_cubemap_texture_unit = 7;
@@ -110,7 +122,7 @@ fn draw(
             gl::NamedBufferSubData(
                 skybox_bo,
                 0,
-                (cube.len() * std::mem::size_of::<Vertex>()) as GLsizeiptr,
+                (cube.len() * std::mem::size_of::<VertexUVNormal>()) as GLsizeiptr,
                 cube.as_ptr() as *const GLvoid,
             )
         };
@@ -159,13 +171,13 @@ fn draw(
             gl::NamedBufferSubData(
                 cube_bo,
                 0,
-                (cube.len() * std::mem::size_of::<Vertex>()) as GLsizeiptr,
+                (cube.len() * std::mem::size_of::<VertexUVNormal>()) as GLsizeiptr,
                 cube.as_ptr() as *const GLvoid,
             )
         };
 
         unsafe { gl::BindVertexArray(cube_vao) };
-        Vertex::vertex_specification(cube_vao, cube_bo);
+        VertexUVNormal::vertex_specification(cube_vao, cube_bo);
 
         // ************************************************************************
         // Create cubes offsets buffer and bind them to be used for instanced drawing
@@ -261,7 +273,7 @@ fn main() {
         gl::CreateBuffers(1, &mut cube_bo);
         gl::NamedBufferData(
             cube_bo,
-            (cube().len() * std::mem::size_of::<Vertex>()) as GLsizeiptr,
+            (cube().len() * std::mem::size_of::<VertexUVNormal>()) as GLsizeiptr,
             std::ptr::null(),
             gl::DYNAMIC_DRAW,
         )
@@ -272,7 +284,7 @@ fn main() {
         gl::CreateBuffers(1, &mut skybox_bo);
         gl::NamedBufferData(
             skybox_bo,
-            (cube().len() * std::mem::size_of::<Vertex>()) as GLsizeiptr,
+            (cube().len() * std::mem::size_of::<VertexUVNormal>()) as GLsizeiptr,
             std::ptr::null(),
             gl::DYNAMIC_DRAW,
         )
@@ -351,12 +363,28 @@ fn main() {
         .to_rgb(),
     );
 
+    // Ignore the rotations and the names, like this is works and that's it
     let sky_cubemap_texture = TextureCubeMap::new([
+        image::open(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/textures/skybox/front.jpg"
+        ))
+        .unwrap()
+        .rotate270()
+        .to_rgb(),
+        image::open(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/textures/skybox/back.jpg"
+        ))
+        .unwrap()
+        .rotate90()
+        .to_rgb(),
         image::open(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/textures/skybox/right.jpg"
         ))
         .unwrap()
+        .rotate180()
         .to_rgb(),
         image::open(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -369,24 +397,14 @@ fn main() {
             "/textures/skybox/top.jpg"
         ))
         .unwrap()
+        .rotate270()
         .to_rgb(),
         image::open(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/textures/skybox/bottom.jpg"
         ))
         .unwrap()
-        .to_rgb(),
-        image::open(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/textures/skybox/front.jpg"
-        ))
-        .unwrap()
-        .to_rgb(),
-        image::open(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/textures/skybox/back.jpg"
-        ))
-        .unwrap()
+        .rotate270()
         .to_rgb(),
     ]);
 
