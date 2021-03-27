@@ -1,6 +1,6 @@
 // TODO(Andrea):
-// - Skybox far plane clipping
-// - Cazzo di compute shader
+// - Cube reflections using skybox
+// - Occlusion culling compute shader
 
 use gl::types::*;
 
@@ -84,6 +84,19 @@ fn draw(
         20.0 + 1.0 * (2.0 * 3.14 * 1e-2 * time).cos() as f32,
     );
 
+    let skybox_model = glm::translate(
+        &glm::scale(
+            &glm::identity(),
+            &glm::vec3(FAR_DISTANCE * 1.0, FAR_DISTANCE * 1.0, FAR_DISTANCE * 1.0), // will be a 64x64x64 cube centered at (0,0,0)
+        ),
+        &glm::vec3(1.0 / 4., 1.0 / 4., 0.0),
+    );
+
+    let skybox_view = glm::mat3_to_mat4(&glm::mat4_to_mat3(&view));
+
+    let skybox_projection: glm::Mat4 =
+        glm::perspective(aspect_ratio, fov, NEAR_DISTANCE, 2.0 * FAR_DISTANCE);
+
     // *************************************************************************
     // Use raycasting to figure out which cubes to display
     let mut offsets = raycast(aspect_ratio, fov, camera_pos, camera_ray, &up, chunk);
@@ -99,19 +112,9 @@ fn draw(
 
         skybox_program.use_();
 
-        let model = glm::translate(
-            &glm::scale(
-                &glm::identity(),
-                &glm::vec3(FAR_DISTANCE * 1.0, FAR_DISTANCE * 1.0, FAR_DISTANCE * 1.0), // will be a 64x64x64 cube centered at (0,0,0)
-            ),
-            &glm::vec3(1.0 / 4., 1.0 / 4., 0.0),
-        );
-
-        skybox_program.set_uniform_mat4(0, &model);
-        let view_no_translate = glm::mat3_to_mat4(&glm::mat4_to_mat3(&view));
-
-        skybox_program.set_uniform_mat4(1, &view_no_translate);
-        skybox_program.set_uniform_mat4(2, &projection);
+        skybox_program.set_uniform_mat4(0, &skybox_model);
+        skybox_program.set_uniform_mat4(1, &skybox_view);
+        skybox_program.set_uniform_mat4(2, &skybox_projection);
 
         let sky_cubemap_texture_unit = 7;
         sky_cubemap_texture.bind(sky_cubemap_texture_unit);
@@ -155,6 +158,10 @@ fn draw(
         let mossy_cobblestone_texture_unit = 12;
         mossy_cobblestone_texture.bind(mossy_cobblestone_texture_unit);
         textured_phong_cube_program.set_uniform_sampler(3, mossy_cobblestone_texture_unit);
+
+        let sky_cubemap_texture_unit = 7;
+        sky_cubemap_texture.bind(sky_cubemap_texture_unit);
+        textured_phong_cube_program.set_uniform_sampler(6, sky_cubemap_texture_unit);
 
         // ************************************************************************
         // Pass additional data to shaders

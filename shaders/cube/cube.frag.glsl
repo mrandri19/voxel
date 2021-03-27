@@ -10,6 +10,7 @@ layout(location = 2) uniform mat4 projection;
 layout(location = 3) uniform sampler2D tex;
 layout(location = 4) uniform vec3 camera_position;
 layout(location = 5) uniform vec3 light_position;
+layout(location = 6) uniform samplerCube skybox;
 
 layout(location = 0) out vec4 out_color;
 
@@ -51,9 +52,16 @@ void main() {
   vec3 specular_color = specular_strength * specular_intensity * light_color;
 
   // ***************************************************************************
+  // Environment mapping: reflection
+  vec3 camera_to_object = in_model_position - camera_position;
+  vec3 reflected = reflect(camera_to_object, in_normal);
+  vec3 reflected_color = texture(skybox, reflected).rgb;
+
+  // ***************************************************************************
   // Sum up all light contributions
-  vec3 result = (ambient_color + diffuse_color + specular_color) *
-                vec3(texture(tex, in_texture_uv));
+  vec3 result =
+      (ambient_color + diffuse_color + specular_color + reflected_color) *
+      vec3(texture(tex, in_texture_uv));
 
   // ***************************************************************************
   // Gamma correction
